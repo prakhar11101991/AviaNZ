@@ -79,7 +79,7 @@ class AviaNZ(QMainWindow):
     """Main class for the user interface.
     Contains most of the user interface and plotting code"""
 
-    def __init__(self,root=None,configdir=None,CLI=False,cheatsheet=False,firstFile='', imageFile='', command=''):
+    def __init__(self,root=None,configdir=None,CLI=False,cheatsheet=False,zooniverse=False,firstFile='', imageFile='', command=''):
         """Initialisation of the class. Load main config and bird lists from configdir.
         Also initialises the data structures and loads an initial file (specified explicitly)
         and sets up the window.
@@ -90,6 +90,8 @@ class AviaNZ(QMainWindow):
         self.root = root
         self.CLI = CLI
         self.cheatsheet = cheatsheet
+        self.zooniverse = True
+        #self.zooniverse = True #zooniverse
 
         # At this point, the main config file should already be ensured to exist.
         self.configfile = os.path.join(configdir, "AviaNZconfig.txt")
@@ -238,7 +240,6 @@ class AviaNZ(QMainWindow):
         if self.CLI:
             if cheatsheet:
                 # use infile and imagefile as directories 
-                print(firstFile)
                 files = [f for f in os.listdir(firstFile) if f[-4:]=='.wav']
                 for f in files:
                     self.loadFile(f)
@@ -498,7 +499,8 @@ class AviaNZ(QMainWindow):
         self.ampaxis.setLabel('')
 
         self.specaxis = pg.AxisItem(orientation='left')
-        self.w_spec.addItem(self.specaxis,row=0,col=0)
+        if not self.zooniverse:
+            self.w_spec.addItem(self.specaxis,row=0,col=0)
         self.specaxis.linkToView(self.p_spec)
         self.specaxis.setWidth(w=65)
 
@@ -1111,7 +1113,8 @@ class AviaNZ(QMainWindow):
                     else:
                         self.timeaxis = SupportClasses.TimeAxisMin(orientation='bottom',linkView=self.p_ampl)
 
-                self.w_spec.addItem(self.timeaxis, row=1, col=1)
+                if not self.zooniverse:
+                    self.w_spec.addItem(self.timeaxis, row=1, col=1)
 
                 # This next line is a hack to make the axis update
                 #self.changeWidth(self.widthWindow.value())
@@ -1609,22 +1612,49 @@ class AviaNZ(QMainWindow):
         FreqRange = self.maxFreqShow-self.minFreqShow
         height = self.sampleRate // 2 / np.shape(self.sg)[1]
         SpecRange = FreqRange/height
-        self.specaxis.setTicks([[(0,round(self.minFreqShow/1000, 2)),
+        if self.zooniverse:
+            # Don't show the Freq axis, just add some numbers into the image itself
+            label = pg.TextItem(text='0', color='g', anchor=(0,0))
+            self.p_spec.addItem(label)
+            label.setPos(self.convertAmpltoSpec(0.01), 0)
+
+            label = pg.TextItem(text=str(round(self.minFreqShow/1000+FreqRange/4000)), color='g', anchor=(0,0))
+            self.p_spec.addItem(label)
+            label.setPos(self.convertAmpltoSpec(0.01), SpecRange/4)
+
+            label = pg.TextItem(text=str(round(self.minFreqShow/1000+FreqRange/2000)), color='g', anchor=(0,0))
+            self.p_spec.addItem(label)
+            label.setPos(self.convertAmpltoSpec(0.01), SpecRange/2)
+            #(SpecRange/2,round(self.minFreqShow/1000+FreqRange/2000, 2))
+
+            label = pg.TextItem(text=str(round(self.minFreqShow/1000+3*FreqRange/4000)), color='g', anchor=(0,0))
+            self.p_spec.addItem(label)
+            label.setPos(self.convertAmpltoSpec(0.01), 3*SpecRange/4)
+            #(3*SpecRange/4,round(self.minFreqShow/1000+3*FreqRange/4000, 2))
+            label = pg.TextItem(text=str(round(self.minFreqShow/1000+FreqRange/1000)), color='g', anchor=(0,0))
+            self.p_spec.addItem(label)
+            label.setPos(self.convertAmpltoSpec(0.01), SpecRange)
+            #(SpecRange,round(self.minFreqShow/1000+FreqRange/1000, 2))
+            #if hasattr(self, 'timeaxis'):
+                #self.w_spec.removeItem(self.timeaxis)
+        else:
+            self.specaxis.setTicks([[(0,round(self.minFreqShow/1000, 2)),
                                  (SpecRange/4,round(self.minFreqShow/1000+FreqRange/4000, 2)),
                                  (SpecRange/2,round(self.minFreqShow/1000+FreqRange/2000, 2)),
                                  (3*SpecRange/4,round(self.minFreqShow/1000+3*FreqRange/4000, 2)),
                                  (SpecRange,round(self.minFreqShow/1000+FreqRange/1000, 2))]])
-        self.specaxis.setLabel('kHz')
+            self.specaxis.setLabel('kHz')
 
         self.updateOverview()
         self.textpos = int((self.maxFreqShow-self.minFreqShow)/height) #+ self.config['textoffset']
 
         # If there are segments, show them
-        for count in range(len(self.segments)):
-            if self.segments[count][2] == 0 and self.segments[count][3] == 0:
-                self.addSegment(self.segments[count][0], self.segments[count][1],0,0,self.segments[count][4],False,count,remaking)
-            else:
-                self.addSegment(self.segments[count][0], self.segments[count][1],self.convertFreqtoY(self.segments[count][2]),self.convertFreqtoY(self.segments[count][3]),self.segments[count][4],False,count,remaking)
+        if not self.zooniverse:
+            for count in range(len(self.segments)):
+                if self.segments[count][2] == 0 and self.segments[count][3] == 0:
+                    self.addSegment(self.segments[count][0], self.segments[count][1],0,0,self.segments[count][4],False,count,remaking)
+                else:
+                    self.addSegment(self.segments[count][0], self.segments[count][1],self.convertFreqtoY(self.segments[count][2]),self.convertFreqtoY(self.segments[count][3]),self.segments[count][4],False,count,remaking)
 
         #self.drawProtocolMarks()
 
