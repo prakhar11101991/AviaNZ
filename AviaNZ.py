@@ -3848,7 +3848,7 @@ class AviaNZ(QMainWindow):
         else:
             ff = True
         # print("wind, rain, ff:", wind, rain, ff)
-        speciesData = {'Name': self.species, 'SampleRate': fs, 'TimeRange': [minLen,maxLen], 'FreqRange': [minFrq, maxFrq]}
+        speciesData = {'Name': self.species, 'SampleRate': fs, 'TimeRange': [minLen, maxLen], 'FreqRange': [minFrq, maxFrq], 'WaveletParams': [0, 0]}
         ws = WaveletSegment.WaveletSegment(speciesData)
         # calculate f0_low and f0_high from GT
         if ff:
@@ -3897,7 +3897,7 @@ class AviaNZ(QMainWindow):
         with pg.BusyCursor():
             opstartingtime = time.time()
             speciesData = {'Name': self.species, 'SampleRate': fs, 'TimeRange': [minLen, maxLen],
-                           'FreqRange': [minFrq, maxFrq]}
+                    'FreqRange': [minFrq, maxFrq], 'WaveletParams': [0, 0]}
             # returns 2d lists of nodes over M x thr, or stats over M x thr
             #thrList = np.linspace(0.1, 1, num=self.waveletTDialog.setthr.value()) Virginia test to finde inconsistency
             thrList = np.linspace(0, 1, num=self.waveletTDialog.setthr.value())
