@@ -208,8 +208,7 @@ class WaveletSegment:
         detected = np.array([])
 
         # Loads all audio data to memory
-        self.loadDirectory(dirName=dirName, denoise=d, filter=f, keepaudio=True, wpmode="new",
-                           savedetections=savedetections, train=False, window=window, inc=inc)
+        self.loadDirectory(dirName=dirName, denoise=d, filter=f, window=window, inc=inc)
 
         # remember to convert main structures to np arrays
         self.annotation = np.array(self.annotation)
@@ -486,25 +485,24 @@ class WaveletSegment:
         nodenum = 0
         maxE = np.zeros((len(MList), nw, len(nodelist)))
         for node in nodelist:
+            # how many samples went into one WC?
+            samples_wc = 2**math.floor(math.log2(node+1))
+            duration_wc = int(duration/samples_wc)
             # put WC from test node(s) on the new tree
-            C = wf.reconstructWP2(node,antialias=aa, antialiasFilter=True)
+            C = wf.tree[node][0::2]
             # Sanity check for all zero case
             if not any(C):
                 continue
 
-            if len(C) > duration:
-                C = C[:duration]
+            if len(C) > duration_wc:
+                C = C[:duration_wc]
 
-            # Filter
-            if rf:
-                C = self.sp.ButterworthBandpass(C, self.spInfo['SampleRate'], low=self.spInfo['FreqRange'][0],
-                                                high=self.spInfo['FreqRange'][1])
             C = np.abs(C)
             N = len(C)
 
             # Compute threshold using mean & sd from non-call sections
             if annotation is not None:
-                noiseSamples = np.repeat(annotation == 0, resol_sr)
+                noiseSamples = np.repeat(annotation == 0, resol_sr/samples_wc)
                 noiseSamples = noiseSamples[:len(C)]
             else:
                 print("Warning: no annotations detected in file")
@@ -516,14 +514,15 @@ class WaveletSegment:
             # using different M values, for a single node.
             for indexM in range(len(MList)):
                 # Compute the number of samples in a window -- species specific
-                M = int(MList[indexM] * win_sr)
+                # Convert M to number of WCs
+                M = int(MList[indexM] * win_sr/samples_wc)
                 E = ce.EnergyCurve(C, M)
                 # for each sliding window, find largest E
                 start = 0
                 for j in range(nw):
-                    end = min(N, start + win_sr)
+                    end = min(N, int(start + win_sr/samples_wc))
                     maxE[indexM, j, nodenum] = (np.log(np.max(E[start:end])) - meanC) / stdC
-                    start += inc_sr
+                    start += int(inc_sr/samples_wc)
             nodenum += 1
 
         del C
@@ -564,11 +563,11 @@ class WaveletSegment:
         duration = len(wf.tree[0])
 
         # Virginia: added window sample rate
-        win_sr = math.ceil(window * self.sampleRate)
+        win_sr = math.ceil(window * spInfo['SampleRate'])
         # Increment length in samples
-        inc_sr = math.ceil(inc * self.sampleRate)
+        inc_sr = math.ceil(inc * spInfo['SampleRate'])
         # Resolution length in samples
-        resol_sr = math.ceil(resol * self.sampleRate)
+        resol_sr = math.ceil(resol * spInfo['SampleRate'])
 
         thr = spInfo['WaveletParams'][0]
         # Compute the number of samples in a window -- species specific
@@ -579,49 +578,41 @@ class WaveletSegment:
 
         count = 0
         for node in nodelist:
+            samples_wc = 2**math.floor(math.log2(node+1))
+            duration_wc = int(duration/samples_wc)
             # put WC from test node(s) on the new tree
-            C = wf.reconstructWP2(node,antialias=aa, antialiasFilter=True)
+            C = wf.tree[node][0::2]
+
             # Sanity check for all zero case
             if not any(C):
-                continue    # return np.zeros(nw)
+                continue
 
-            if len(C) > duration:
-                C = C[:duration]
+            if len(C) > duration_wc:
+                C = C[:duration_wc]
 
-            # Filter
-            if rf:
-                C = self.sp.ButterworthBandpass(C, self.sampleRate, low=spInfo['FreqRange'][0],
-                                                high=spInfo['FreqRange'][1])
             C = np.abs(C)
             N = len(C)
-            # Virginia: number of segments = number of centers of length inc
-            # nw=int(np.ceil(N / inc_sr))
-            # detected = np.zeros(nw)
+
+            meanC = np.mean(np.log(C))
+            stdC = np.std(np.log(C))
 
             # Compute the energy curve (a la Jinnai et al. 2012)
-            E = ce.EnergyCurve(C, M)
-            # Compute threshold using mean & sd from non-call sections
-            # Virginia: changed the base. I'm using resol_sr as a base. Cause I'm looking for detections on windows.
-            #This step is not so clear for me
-            if annotation is not None:
-                noiseSamples = np.repeat(annotation == 0, resol_sr)
-                noiseSamples = noiseSamples[:len(C)]
-                C = C[noiseSamples]
-            C = np.log(C)
-            threshold = np.exp(np.mean(C) + np.std(C) * thr)
+            M_wc = int(M/samples_wc)
+            E = ce.EnergyCurve(C, M_wc)
+            # extract max E
+            start = 0
+            maxE = np.zeros(nw)
+            for w in range(nw):
+                end = min(N, int(start + win_sr/samples_wc))
+                maxE[w] = (np.log(np.max(E[start:end])) - meanC) / stdC
+                start += int(inc_sr/samples_wc)
 
-            # If there is a call anywhere in the window, report it as a call
-            # Virginia-> for each sliding window:
-            # start is the sample start of a window
-            # end is the sample end of a window
-            # The window are sliding windows: starting from data start
-            #center = int(math.ceil(inc_sr/2)) #keeped if neede in future
-            start = 0 #inizializzation
-            for j in range(nw):
-                #start = max(0, center - win_sr2) keeped if needed in future
-                end = min(N, start + win_sr)
-                detected[j, count] = np.any(E[start:end] > threshold)
-                start += inc_sr  # Virginia: corrected
+            if all(np.isinf(maxE)):
+                print("Warning: skipping node %d because all samples appear infinite" % node)
+                continue
+
+            detected[:, count] = maxE > thr
+            print(detected)
             count += 1
 
         detected = np.max(detected, axis=1)

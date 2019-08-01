@@ -3900,8 +3900,8 @@ class AviaNZ(QMainWindow):
                     'FreqRange': [minFrq, maxFrq], 'WaveletParams': [0, 0]}
             # returns 2d lists of nodes over M x thr, or stats over M x thr
             #thrList = np.linspace(0.1, 1, num=self.waveletTDialog.setthr.value()) Virginia test to finde inconsistency
-            thrList = np.linspace(0, 1, num=self.waveletTDialog.setthr.value())
-            MList = np.linspace(0.25, 1.5, num=self.waveletTDialog.setM.value())
+            thrList = np.linspace(0, 1, num=self.waveletTDialog.setthr.value()) #0,1
+            MList = np.linspace(0.25, 1.5, num=self.waveletTDialog.setM.value()) #0.25, 1.5
             # options for training are: recsep (old), recmulti (joint reconstruction), ethr (threshold energies), elearn (model from energies)
             # Virginia: added window and increment as input. Window and inc are supposed to be in seconds
             window = 1
