@@ -272,6 +272,7 @@ class Clustering:
 
         # 1. Get the frequency band and sampling frequency from annotations
         fs, f1, f2 = self.getFrq(dirname, species)
+        print("Features will be defined on freq %d-%d Hz" % (f1, f2))
 
         # 2. Find the lower and upper bounds (relevant to the frq range)
         if feature == 'mfcc' and f1 != 0 and f2 != 0:
@@ -279,14 +280,25 @@ class Clustering:
             ind_flow = (np.abs(mels - f1)).argmin()
             ind_fhigh = (np.abs(mels - f2)).argmin()
 
-        elif feature == 'we' and f1 != 0 and f2 != 0:
-            linear = np.linspace(0, fs / 2, 62)
-            ind_flow = (np.abs(linear - f1)).argmin()
-            ind_fhigh = (np.abs(linear - f2)).argmin()
+        elif feature == 'we':
+            # skip low level nodes, and nodes outside freq range when it is given
+            if f1==0 and f2==0:
+                possibleNodes = range(30, 62)
+            else:
+                WF = WaveletFunctions.WaveletFunctions(data=[], wavelet='dmey2', maxLevel=6, samplerate=fs)
+                possibleNodes = []
+                for node in range(30, 62):
+                    nodefl, nodefu = WF.getWCFreq(node, fs)
+                    if nodefl < f2 and nodefu > f1:
+                        possibleNodes.append(node)
+                # possibleNodes = [17, 36, 43, 44]
+            print("Will cluster using wavelet nodes:", possibleNodes)
 
         # 3. Clustering at syllable level, therefore find the syllables in each segment
         dataset = self.findSyllables(dirname, species, minlen, fs, f1, f2, denoise)
         # dataset format: [[file1, seg1, syl1], [file1, seg1, syl2], [file1, seg2, syl1],..]
+        _, counts = np.unique([str(row[0])+str(row[1]) for row in dataset], return_counts=True)
+        print("Numbers of syllables found per segment: ", counts)
 
         # Make syllables fixed-length (again to have same sized feature matrices) and generate features
         lengths = []
@@ -303,8 +315,9 @@ class Clustering:
         # 4. Read the syllables and generate features, also zero padding short syllables
         features = []
         for record in dataset:
+            print("reading syllable at %.2f - %.2f s" %(record[2][0], record[2][1]))
             audiodata = self.loadFile(filename=record[0], duration=record[2][1] - record[2][0], offset=record[2][0],
-                                      fs=fs, denoise=denoise, f1=f1, f2=f2)
+                                      fs=fs, denoise=denoise, f1=f1, f2=f2, silent=True)
             audiodata = audiodata.tolist()
             if record[2][1] - record[2][0] < duration:
                 # Zero padding both ends to have fixed duration
@@ -326,9 +339,9 @@ class Clustering:
             elif feature == 'we':  # Wavelet Energy
                 ws = WaveletSegment.WaveletSegment(spInfo={})
                 we = ws.computeWaveletEnergy(data=audiodata, sampleRate=fs, nlevels=5, wpmode='new')
-                we = we.mean(axis=1)
-                if f1 != 0 and f2 != 0:
-                    we = we[ind_flow:ind_fhigh]  # Limit the frequency to a fixed range f1, f2
+                we = np.log(we.mean(axis=1))
+                we = (we-np.mean(we)) / np.std(we)
+                we = we[possibleNodes]  # Limit the frequency to a fixed range f1, f2
                 features.append(we)
                 record.insert(3, we)
             elif feature == 'chroma':
@@ -339,7 +352,7 @@ class Clustering:
                 record.insert(3, chroma)
 
         # 5. Actual clustering
-        features = TSNE().fit_transform(features)
+        #features = TSNE().fit_transform(features)
         self.features = features
 
         model = self.trainModel()
@@ -603,17 +616,25 @@ class Clustering:
             ind_flow = (np.abs(mels - f1)).argmin()
             ind_fhigh = (np.abs(mels - f2)).argmin()
 
-        elif feature == 'we' and f1 != 0 and f2 != 0:
-            linear = np.linspace(0, fs / 2, 62)
-            ind_flow = (np.abs(linear - f1)).argmin()
-            ind_fhigh = (np.abs(linear - f2)).argmin()
+        elif feature == 'we':
+            # skip low level nodes, and nodes outside freq range when it is given
+            if f1==0 and f2==0:
+                possibleNodes = range(30, 62)
+            else:
+                WF = WaveletFunctions.WaveletFunctions(data=[], wavelet='dmey2', maxLevel=6, samplerate=fs)
+                possibleNodes = []
+                for node in range(30, 62):
+                    nodefl, nodefu = WF.getWCFreq(node, fs)
+                    if nodefl < f2 and nodefu > f1:
+                        possibleNodes.append(node)
+            print("Using wavelet nodes:", possibleNodes)
 
         fc = []
         for record in cluster:
             # Compute the features of each syllable in this segment
             for syl in record[2]:
                 audiodata = self.loadFile(filename=record[0], duration=syl[1] - syl[0], offset=syl[0], fs=fs,
-                                          denoise=denoise, f1=f1, f2=f2)
+                                          denoise=denoise, f1=0, f2=0, silent=True)
                 audiodata = audiodata.tolist()
                 if syl[1] - syl[0] < duration:
                     # Zero padding both ends to have fixed duration
@@ -634,9 +655,9 @@ class Clustering:
                 elif feature == 'we':  # Wavelet Energy
                     ws = WaveletSegment.WaveletSegment(spInfo={})
                     we = ws.computeWaveletEnergy(data=audiodata, sampleRate=fs, nlevels=5, wpmode='new')
-                    we = we.mean(axis=1)
-                    if f1 != 0 and f2 != 0:
-                        we = we[ind_flow:ind_fhigh]  # Limit the frequency to a fixed range f1, f2
+                    we = np.log(we.mean(axis=1))
+                    we = (we-np.mean(we)) / np.std(we)
+                    we = we[possibleNodes]  # Limit the frequency to a fixed range f1, f2
                     fc.append(we)
                 elif feature == 'chroma':
                     chroma = librosa.feature.chroma_cqt(y=audiodata, sr=fs)
@@ -646,7 +667,7 @@ class Clustering:
         return np.mean(fc, axis=0)
 
 
-    def loadFile(self, filename, duration=0, offset=0, fs=0, denoise=False, f1=0, f2=0):
+    def loadFile(self, filename, duration=0, offset=0, fs=0, denoise=False, f1=0, f2=0, silent=False):
         """
         Read audio file and preprocess as required.
         """
@@ -654,7 +675,8 @@ class Clustering:
             duration = None
 
         sp = SignalProc.SignalProc(256, 128)
-        sp.readWav(filename, duration, offset)
+        # when silent, returns (nchannels samplerate bitdepth)
+        sp.readWav(filename, duration, offset, silent=silent)
         sp.resample(fs)
         sampleRate = sp.sampleRate
         audiodata = sp.data
