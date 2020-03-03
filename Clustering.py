@@ -268,7 +268,12 @@ class Clustering:
                  fs, nclasses, syllable duration (median)
         """
 
+        import pyqtgraph as pg
+        import pyqtgraph.exporters as pge
+        import heapq
+
         self.alg = alg
+        sp = SignalProc.SignalProc()
 
         # 1. Get the frequency band and sampling frequency from annotations
         fs, f1, f2 = self.getFrq(dirname, species)
@@ -314,6 +319,8 @@ class Clustering:
 
         # 4. Read the syllables and generate features, also zero padding short syllables
         features = []
+        count = 0
+        imagewindow = pg.image()
         for record in dataset:
             print("reading syllable at %.2f - %.2f s" %(record[2][0], record[2][1]))
             audiodata = self.loadFile(filename=record[0], duration=record[2][1] - record[2][0], offset=record[2][0],
@@ -326,6 +333,7 @@ class Clustering:
                 audiodata.extend(z)
                 z.extend(audiodata)
                 audiodata = z
+
             if feature == 'mfcc':  # MFCC
                 mfcc = librosa.feature.mfcc(y=np.asarray(audiodata), sr=fs, n_mfcc=n_mels)
                 if f1 != 0 and f2 != 0:
@@ -339,6 +347,12 @@ class Clustering:
             elif feature == 'we':  # Wavelet Energy
                 ws = WaveletSegment.WaveletSegment(spInfo={})
                 we = ws.computeWaveletEnergy(data=audiodata, sampleRate=fs, nlevels=5, wpmode='new')
+                we[np.isnan(we)] = 0
+                nkeep = 5
+                newwe = np.zeros((np.shape(we)[0],nkeep))
+                for i in range(np.shape(we)[0]):
+                    newwe[i,:] = we[i,heapq.nlargest(nkeep, range(np.shape(we)[1]), we[i,:].take)]
+                we = np.squeeze(newwe)
                 we = np.log(we.mean(axis=1))
                 we = (we-np.mean(we)) / np.std(we)
                 we = we[possibleNodes]  # Limit the frequency to a fixed range f1, f2
@@ -351,9 +365,37 @@ class Clustering:
                 features.append(chroma)
                 record.insert(3, chroma)
 
+            # Sgram images
+            sp.data = audiodata
+            sp.sampleRate = fs
+            sgRaw = sp.spectrogram(256, 128)
+
+            maxsg = np.min(sgRaw)
+            sg = np.abs(np.where(sgRaw == 0, 0.0, 10.0 * np.log10(sgRaw / maxsg)))
+            sgmax = np.max(sg)
+            #sg = np.where(sg>0.75*sgmax,sg,0)
+            #if count==0:
+                #sginit = np.copy(sg)
+            #diff = np.log(np.sum((sginit-sg)**2))
+            diff = (np.sum(features[-1] - features[0])**2)
+    
+            img = pg.ImageItem(sg)
+            imagewindow.clear()
+            imagewindow.setImage(np.flip(sg, 1))
+            exporter = pge.ImageExporter(imagewindow.view)
+            exporter.export('syll_' + "%03d_%04f" % (count , diff) + '.png')
+            count += 1
+
+
         # 5. Actual clustering
         #features = TSNE().fit_transform(features)
         self.features = features
+        print("****")
+        print(np.shape(features))
+        print(features[0])
+        for i in range(np.shape(features)[0]):
+            for j in range(i,np.shape(features)[0]):
+                print(np.sum(features[i] - features[j])**2)
 
         model = self.trainModel()
         predicted_labels = model.labels_
@@ -595,7 +637,9 @@ class Clustering:
                 model = self.agglomerativeClustering(n_clusters=None, compute_full_tree=True, distance_threshold=0.5,
                                                      linkage='complete')
             else:
-                model = self.agglomerativeClustering(n_clusters=self.n_clusters, compute_full_tree=False,
+                print("BODGE!!")
+                #model = self.agglomerativeClustering(n_clusters=self.n_clusters, compute_full_tree=False,
+                model = self.agglomerativeClustering(n_clusters=2, compute_full_tree=False,
                                                      distance_threshold=None, linkage='complete')
             model.fit_predict(self.features)
         return model
