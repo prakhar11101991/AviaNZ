@@ -250,7 +250,7 @@ class Clustering:
 
         return som
 
-    def cluster(self, dirname, species=None, feature='we', n_mels=24, minlen=0.2, denoise=False, alg='agglomerative'):
+    def cluster(self, dirname, species=None, feature='mfcc', n_mels=24, minlen=0.2, denoise=False, alg='agglomerative'):
         """
         Cluster segments during training to make sub-filters.
         Given wav + annotation files,
