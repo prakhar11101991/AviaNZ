@@ -292,11 +292,11 @@ class Clustering:
             else:
                 WF = WaveletFunctions.WaveletFunctions(data=[], wavelet='dmey2', maxLevel=6, samplerate=fs)
                 possibleNodes = []
-                for node in range(30, 62):
+                for node in range(31, 63):
                     nodefl, nodefu = WF.getWCFreq(node, fs)
                     if nodefl < f2 and nodefu > f1:
-                        possibleNodes.append(node)
-                # possibleNodes = [17, 36, 43, 44]
+                        # because computeWE uses unrooted tree:
+                        possibleNodes.append(node-1)
             print("Will cluster using wavelet nodes:", possibleNodes)
 
         # 3. Clustering at syllable level, therefore find the syllables in each segment
@@ -321,6 +321,7 @@ class Clustering:
         features = []
         count = 0
         imagewindow = pg.image()
+
         for record in dataset:
             print("reading syllable at %.2f - %.2f s" %(record[2][0], record[2][1]))
             audiodata = self.loadFile(filename=record[0], duration=record[2][1] - record[2][0], offset=record[2][0],
@@ -384,6 +385,10 @@ class Clustering:
             imagewindow.setImage(np.flip(sg, 1))
             exporter = pge.ImageExporter(imagewindow.view)
             exporter.export('syll_' + "%03d_%04f" % (count , diff) + '.png')
+
+            # TEMP: export WP energies
+            # np.savetxt('syll_' + '%03d' % count + '.energies', we, delimiter="\t")
+
             count += 1
 
 
@@ -394,8 +399,10 @@ class Clustering:
         print(np.shape(features))
         print(features[0])
         for i in range(np.shape(features)[0]):
+            prdiff = ""
             for j in range(i,np.shape(features)[0]):
-                print(np.sum(features[i] - features[j])**2)
+                prdiff = prdiff + str(np.sum(features[i] - features[j])**2) + "\t"
+            print(prdiff)
 
         model = self.trainModel()
         predicted_labels = model.labels_
@@ -522,6 +529,10 @@ class Clustering:
 
         if f2 < f1:
             f2 = np.mean(highlist)
+
+        ## TEMP TODO:
+        # override any other samplerate changes, just use the lowest available
+        fs = np.min(srlist)
 
         return fs, f1, f2
 
