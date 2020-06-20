@@ -124,6 +124,7 @@ class AviaNZ(QMainWindow):
         self.startTime = 0
         self.segmentsToSave = False
         self.viewCallType = False
+        self.batmode = False
 
         self.lastSpecies = [{"species": "Don't Know", "certainty": 0, "filter": "M"}]
         self.DOC = self.config['DOC']
@@ -172,13 +173,13 @@ class AviaNZ(QMainWindow):
                 sys.exit()
             else:
                 # pop up a dialog to select file
-                firstFile, drop = QtGui.QFileDialog.getOpenFileName(self, 'Choose File', self.SoundFileDir, "Wav files (*.wav)")
+                firstFile, drop = QFileDialog.getOpenFileName(self, 'Choose File', self.SoundFileDir, "WAV or BMP files (*.wav *.bmp);; Only WAV files (*.wav);; Only BMP files (*.bmp)")
                 while firstFile == '':
                     msg = SupportClasses.MessagePopup("w", "Select Sound File", "Choose a sound file to proceed.\nDo you want to continue?")
                     msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
                     reply = msg.exec_()
                     if reply == QMessageBox.Yes:
-                        firstFile, drop = QFileDialog.getOpenFileName(self, 'Choose File', self.SoundFileDir, "Wav files (*.wav)")
+                        firstFile, drop = QFileDialog.getOpenFileName(self, 'Choose File', self.SoundFileDir, "WAV or BMP files (*.wav *.bmp);; Only WAV files (*.wav);; Only BMP files (*.bmp)")
                     else:
                         sys.exit()
 
@@ -327,11 +328,11 @@ class AviaNZ(QMainWindow):
             self.showInvSpec.setChecked(False)
 
             specMenu.addSeparator()
-            specMenu.addAction("Show training diagnostics",self.showDiagnosticDialog)
-            extraMenu = specMenu.addMenu("Diagnostic plots")
+            self.showDiagnosticTick = specMenu.addAction("Show training diagnostics",self.showDiagnosticDialog)
+            self.extraMenu = specMenu.addMenu("Diagnostic plots")
             extraGroup = QActionGroup(self)
             for ename in ["none", "Wavelet scalogram", "Wavelet correlations", "Wind energy", "Rain", "Filtered spectrogram, new + AA", "Filtered spectrogram, new", "Filtered spectrogram, old"]:
-                em = extraMenu.addAction(ename)
+                em = self.extraMenu.addAction(ename)
                 em.setCheckable(True)
                 if ename == self.extra:
                     em.setChecked(True)
@@ -340,14 +341,14 @@ class AviaNZ(QMainWindow):
                 extraGroup.addAction(em)
 
         specMenu.addSeparator()
-        extraMenu = specMenu.addMenu("Mark on spectrogram")
-        self.showFundamental = extraMenu.addAction("Fundamental frequency", self.showFundamentalFreq,"Ctrl+F")
+        markMenu = specMenu.addMenu("Mark on spectrogram")
+        self.showFundamental = markMenu.addAction("Fundamental frequency", self.showFundamentalFreq,"Ctrl+F")
         self.showFundamental.setCheckable(True)
         self.showFundamental.setChecked(True)
-        self.showSpectral = extraMenu.addAction("Spectral derivative", self.showSpectralDeriv)
+        self.showSpectral = markMenu.addAction("Spectral derivative", self.showSpectralDeriv)
         self.showSpectral.setCheckable(True)
         self.showSpectral.setChecked(False)
-        self.showEnergies = extraMenu.addAction("Maximum energies", self.showMaxEnergy)
+        self.showEnergies = markMenu.addAction("Maximum energies", self.showMaxEnergy)
         self.showEnergies.setCheckable(True)
         self.showEnergies.setChecked(False)
 
@@ -366,10 +367,10 @@ class AviaNZ(QMainWindow):
 
         actionMenu = self.menuBar().addMenu("&Actions")
         actionMenu.addAction("&Delete all segments", self.deleteAll, "Ctrl+D")
-        actionMenu.addAction("&Mark regular segments", self.addRegularSegments, "Ctrl+M")
+        self.addRegularAction = actionMenu.addAction("&Mark regular segments", self.addRegularSegments, "Ctrl+M")
 
         actionMenu.addSeparator()
-        actionMenu.addAction("Denoise",self.showDenoiseDialog)
+        self.denoiseAction = actionMenu.addAction("Denoise",self.showDenoiseDialog)
         actionMenu.addAction("Add metadata about noise", self.addNoiseData, "Ctrl+N")
         #actionMenu.addAction("Find matches",self.findMatches)
 
@@ -378,7 +379,7 @@ class AviaNZ(QMainWindow):
             actionMenu.addAction("Denoise spectrogram",self.denoiseImage)
 
         actionMenu.addSeparator()
-        actionMenu.addAction("Segment",self.segmentationDialog,"Ctrl+S")
+        self.segmentAction = actionMenu.addAction("Segment",self.segmentationDialog,"Ctrl+S")
         actionMenu.addAction("Export segments to Excel",self.exportSeg)
 
         if not self.DOC:
@@ -501,7 +502,7 @@ class AviaNZ(QMainWindow):
         fileInfo.addWidget(self.fileInfoDur)
         fileInfo.addStretch(5)
 
-        annotInfo = QLabel("<b>Annotations present</b> (details go here)")
+        # annotInfo = QLabel("<b>Annotations present</b> (details go here)")
 
         self.p_overview = self.w_overview1.addViewBox(enableMouse=False,enableMenu=False,row=0,col=0)
         self.p_overview2 = SupportClasses.ChildInfoViewBox(enableMouse=False, enableMenu=False)
@@ -739,10 +740,10 @@ class AviaNZ(QMainWindow):
         self.volSlider.sliderMoved.connect(self.volSliderMoved)
         self.volSlider.setRange(0,100)
         self.volSlider.setValue(50)
-        volIcon = QLabel()
+        self.volIcon = QLabel()
         #volIcon.setPixmap(self.style().standardIcon(QtGui.QStyle.SP_MediaVolume).pixmap(32))
-        volIcon.setPixmap(QPixmap('img/volume.png').scaled(16, 16, transformMode=1))
-        volIcon.setAlignment(Qt.AlignCenter)
+        self.volIcon.setPixmap(QPixmap('img/volume.png').scaled(16, 16, transformMode=1))
+        self.volIcon.setAlignment(Qt.AlignCenter)
 
         # Brightness, and contrast sliders
         self.brightnessSlider = QSlider(Qt.Horizontal)
@@ -813,7 +814,7 @@ class AviaNZ(QMainWindow):
             # self.w_controls.addWidget(self.quickDenNButton,row=1,col=1)
             self.w_controls.addWidget(self.viewSpButton,row=1,col=3)
 
-        self.w_controls.addWidget(volIcon, row=2, col=0)
+        self.w_controls.addWidget(self.volIcon, row=2, col=0)
         self.w_controls.addWidget(self.volSlider, row=2, col=1, colspan=3)
         self.w_controls.layout.setRowMinimumHeight(2, 30)
 
@@ -903,6 +904,9 @@ class AviaNZ(QMainWindow):
         self.statusLeft = QLabel("Left")
         # Not sure what's the difference between Sunken and Panel?
         self.statusLeft.setFrameStyle(QFrame.Panel | QFrame.Sunken)
+        self.statusBM = QLabel("")
+        self.statusBM.setAlignment(Qt.AlignCenter)
+        self.statusBM.setFrameStyle(QFrame.Panel | QFrame.Sunken)
         self.statusRO = QLabel("")
         self.statusRO.setAlignment(Qt.AlignCenter)
         self.statusRO.setFrameStyle(QFrame.Panel | QFrame.Sunken)
@@ -914,9 +918,10 @@ class AviaNZ(QMainWindow):
         # self.statusLeft.setStyleSheet(statusStyle)
         # self.statusRO.setStyleSheet(statusStyle)
         # self.statusRight.setStyleSheet(statusStyle)
-        self.statusBar().addPermanentWidget(self.statusLeft,1)
+        self.statusBar().addPermanentWidget(self.statusLeft,3)
+        self.statusBar().addPermanentWidget(self.statusBM,1)
         self.statusBar().addPermanentWidget(self.statusRO,1)
-        self.statusBar().addPermanentWidget(self.statusRight,1)
+        self.statusBar().addPermanentWidget(self.statusRight,2)
 
         # Set the message in the status bar
         self.statusLeft.setText("Ready")
@@ -933,6 +938,57 @@ class AviaNZ(QMainWindow):
         # Plot everything
         if not self.CLI:
             self.show()
+
+    def toggleBatMode(self):
+        """ Enables/disables GUI elements when bat mode is entered/left.
+            Called on every load.
+        """
+        if self.batmode:
+            print("Bat mode is ON")
+        else:
+            print("Bat mode is off")
+
+        if self.batmode:
+            self.useAmplitudeTick.setChecked(False)
+            # otherwise leave as it was
+        self.useAmplitudeTick.setEnabled(not self.batmode)
+        self.useAmplitudeCheck()
+
+        if not self.DOC:
+            self.showDiagnosticTick.setEnabled(not self.batmode)
+            self.extraMenu.setEnabled(not self.batmode)
+            self.setExtraPlot("none")
+
+        self.showFundamental.setEnabled(not self.batmode)
+        self.showSpectral.setEnabled(not self.batmode)
+        self.showEnergies.setEnabled(not self.batmode)
+
+        self.addRegularAction.setEnabled(not self.batmode)
+        self.denoiseAction.setEnabled(not self.batmode)
+        self.segmentAction.setEnabled(not self.batmode)
+
+        self.playButton.setEnabled(not self.batmode)
+        self.stopButton.setEnabled(not self.batmode)
+        self.volSlider.setEnabled(not self.batmode)
+        self.volIcon.setEnabled(not self.batmode)
+
+        text = "Bat mode" if self.batmode else ""
+        self.statusBM.setText(text)
+
+        # Also need to enter read-only mode:
+        # no editing of segments, can only change labels on the premade one
+        # But it is a costly operation, so check if needed:
+        if self.batmode and not self.readonly.isChecked():
+            self.readonly.setChecked(True)
+            self.makeReadOnly()
+        elif self.batmode and self.readonly.isChecked():
+            pass
+        elif self.readonly.isChecked() and not self.batmode:
+            self.readonly.setChecked(False)
+            self.makeReadOnly()
+        else:  # not checked, not batmode
+            pass
+        self.readonly.setEnabled(not self.batmode)
 
     def handleKey(self,ev):
         """ Handle keys pressed during program use.
@@ -951,6 +1007,8 @@ class AviaNZ(QMainWindow):
         """
         # basic buttons which toggle on any segment selection
         btns = [self.deleteButton, self.playSegButton, self.playSlowButton, self.quickDenButton, self.exportSoundBtn]
+        # Buttons which should be allowed in batmode
+        batbtns = [self.deleteButton]
 
         # if self.box1id is not -1, flip on, otherwise off
         if self.box1id<0:
@@ -959,16 +1017,20 @@ class AviaNZ(QMainWindow):
             self.playBandLimitedSegButton.setEnabled(False)
             self.confirmButton.setEnabled(False)
         else:
-            for btn in btns:
-                btn.setEnabled(True)
-
-            # special case for BandLimitedButton b/c it requires set freq bands
-            if type(self.listRectanglesa2[self.box1id]) == self.ROItype:
-                # it's a rectangle box:
-                self.playBandLimitedSegButton.setEnabled(True)
+            if self.batmode:
+                for btn in batbtns:
+                    btn.setEnabled(True)
             else:
-                # it's a 0 to inf segment:
-                self.playBandLimitedSegButton.setEnabled(False)
+                for btn in btns:
+                    btn.setEnabled(True)
+
+                # special case for BandLimitedButton b/c it requires set freq bands
+                if type(self.listRectanglesa2[self.box1id]) == self.ROItype:
+                    # it's a rectangle box:
+                    self.playBandLimitedSegButton.setEnabled(True)
+                else:
+                    # it's a 0 to inf segment:
+                    self.playBandLimitedSegButton.setEnabled(False)
 
             # special case for Confirm button b/c it requires yellow segment
             self.confirmButton.setEnabled(False)
@@ -1189,15 +1251,19 @@ class AviaNZ(QMainWindow):
         self.refreshSegmentControls()
 
         # Remove any fundamental frequencies drawn
+        self.showFundamental.setChecked(False)
         for r in self.segmentPlots:
             self.p_spec.removeItem(r)
         self.segmentPlots=[]
 
         # Remove spectral derivatives
+        self.showSpectral.setChecked(False)
         try:
             self.p_spec.removeItem(self.derivPlot)
         except Exception:
             pass
+        # remove max energies
+        self.showEnergies.setChecked(False)
         try:
             self.p_spec.removeItem(self.energyPlot)
         except Exception:
@@ -1217,7 +1283,7 @@ class AviaNZ(QMainWindow):
 
         if fileName is None:
             # File -> Open or splash screen:
-            fileName, drop = QtGui.QFileDialog.getOpenFileName(self, 'Choose File', self.SoundFileDir,"Wav files (*.wav)")
+            firstFile, drop = QFileDialog.getOpenFileName(self, 'Choose File', self.SoundFileDir, "WAV or BMP files (*.wav *.bmp);; Only WAV files (*.wav);; Only BMP files (*.bmp)")
         # (it is provided when this is called by File -> [recent file clicked])
         success = 1
         SoundFileDirOld = self.SoundFileDir
@@ -1237,7 +1303,6 @@ class AviaNZ(QMainWindow):
         Does the safety checks for file existence etc.
         Prepares the program for a new file.
         Saves the segments of the current file, resets flags and calls loadFile().
-        Since the first load (on splash) calls loadFile directly, here we can assume smth is already open.
         """
 
         # Need name of file
@@ -1250,17 +1315,29 @@ class AviaNZ(QMainWindow):
             if not os.path.isfile(fullcurrent):
                 print("File %s does not exist!" % fullcurrent)
                 return(1)
-            # avoid files with no data (Tier 1 has 0Kb .wavs
+            # avoid files with no data (Tier 1 has 0Kb .wavs)
             if os.stat(fullcurrent).st_size == 0:
                 print("Cannot open file %s of size 0!" % fullcurrent)
                 return(1)
             if os.stat(fullcurrent).st_size < 1000:
                 print("File %s appears to have only header" % fullcurrent)
                 return(1)
-            with open(fullcurrent, 'br') as f:
-                if f.read(4) != b'RIFF':
-                    print("File %s not formatted correctly" % fullcurrent)
-                    return(1)
+            if fullcurrent.lower().endswith('.wav'):
+                with open(fullcurrent, 'br') as f:
+                    if f.read(4) != b'RIFF':
+                        print("WAV file %s not formatted correctly" % fullcurrent)
+                        return(1)
+                self.batmode = False
+            elif fullcurrent.lower().endswith('.bmp'):
+                with open(fullcurrent, 'br') as f:
+                    if f.read(2) != b'BM':
+                        print("BMP file %s not formatted correctly" % fullcurrent)
+                        return(1)
+                self.batmode = True
+            else:
+                print("Unrecognized format of file %s " % fullcurrent)
+                return(1)
+            # loadFile will determine mode and update GUI based on self.batmode
 
             # setting this to True forces initial segment save
             # self.segmentsToSave = True
@@ -1303,7 +1380,11 @@ class AviaNZ(QMainWindow):
 
         name: full path to the file to be loaded. If None, loads the next section of the current file
         """
+
+        # reset interface and switch to right mode. We assume that whoever
+        # starts this, already set self.batmode correctly
         self.resetStorageArrays()
+        self.toggleBatMode()
 
         with pg.ProgressDialog("Loading..", 0, 6) as dlg:
             dlg.setCancelButton(None)
@@ -1361,156 +1442,175 @@ class AviaNZ(QMainWindow):
             # Read in the file and make the spectrogram
             # Determine where to start and how much to read for this page (in seconds):
             self.startRead = max(0,self.currentFileSection*self.config['maxFileShow']-self.config['fileOverlap'])
-            if self.startRead == 0:
-                self.lenRead = self.config['maxFileShow']+self.config['fileOverlap']
-            else:
-                self.lenRead = self.config['maxFileShow'] + 2*self.config['fileOverlap']
+            # avoid files with no data (Tier 1 has 0Kb .wavs)
+            if os.stat(self.filename).st_size == 0:
+                self.statusLeft.setText("File appears empty")
+                return
 
-            if os.stat(self.filename).st_size != 0: # avoid files with no data (Tier 1 has 0Kb .wavs)
-                self.sp.readWav(self.filename, self.lenRead, self.startRead)
+            # main read-in:
+            if self.batmode:
+                self.sp.readBmp(name)
+                # this assumes that the entire file is always loaded in BMP mode
+                self.datalength = self.sp.fileLength
+            else:
+                if self.startRead == 0:
+                    lenRead = self.config['maxFileShow'] + self.config['fileOverlap']
+                else:
+                    lenRead = self.config['maxFileShow'] + 2*self.config['fileOverlap']
+
+                self.sp.readWav(self.filename, lenRead, self.startRead)
+                self.datalength = np.shape(self.sp.data)[0]
 
                 # resample to 16K if needed (SignalProc will determine)
                 if cs:
                     self.sp.resample(16000)
                     self.sp.maxFreqShow = 8000
 
-                # Parse wav format details based on file header:
-                self.sampleRate = self.sp.sampleRate
-                self.audiodata = self.sp.data
-                # self.sp.audioFormat will be set
-                # self.sp.fileLength will be determined from wav header
-                # self.sp.minFreq and maxFreq will be set based on sample rate
-                # self.sp.*Show will be set based on SignalProc settings
+            # Parse wav format details based on file header:
+            self.sampleRate = self.sp.sampleRate
+            self.audiodata = self.sp.data
+            # self.sp.audioFormat will be set
+            # self.sp.fileLength will be determined from wav header
+            # self.sp.minFreq and maxFreq will be set based on sample rate
+            # self.sp.*Show will be set based on SignalProc settings
 
-                dlg += 1
-                dlg.update()
+            dlg += 1
+            dlg.update()
 
-                self.datalength = np.shape(self.audiodata)[0]
-                self.datalengthSec = self.datalength / self.sampleRate
-                print("Length of file is ", self.datalengthSec, " seconds (", self.datalength, "samples) loaded from ", self.sp.fileLength / self.sampleRate, "seconds (", self.sp.fileLength, " samples) with sample rate ",self.sampleRate, " Hz.")
+            self.datalengthSec = self.datalength / self.sampleRate
+            print("Length of file is ", self.datalengthSec, " seconds (", self.datalength, "samples) loaded from ", self.sp.fileLength / self.sampleRate, "seconds (", self.sp.fileLength, " samples) with sample rate ",self.sampleRate, " Hz.")
 
-                if name is not None: # i.e. starting a new file, not next section
-                    if self.datalength != self.sp.fileLength:
-                        #print("not all of file loaded")
-                        self.nFileSections = int(np.ceil(self.sp.fileLength/self.datalength))
-                        self.prev5mins.setEnabled(False)
-                        self.next5mins.setEnabled(True)
-                        self.movePrev5minsKey.setEnabled(False)
-                        self.moveNext5minsKey.setEnabled(True)
-                    else:
-                        self.nFileSections = 1
-                        self.prev5mins.setEnabled(False)
-                        self.next5mins.setEnabled(False)
-                        self.movePrev5minsKey.setEnabled(False)
-                        self.moveNext5minsKey.setEnabled(False)
-                    print('number of pages: ', self.nFileSections)
-
-                # Update overview info
-                if self.nFileSections == 1:
-                    self.placeInFileLabel.setText("(%d s in 1 page)" % self.datalengthSec)
+            if name is not None:  # i.e. starting a new file, not next section
+                if self.datalength != self.sp.fileLength:
+                    self.nFileSections = int(np.ceil(self.sp.fileLength/self.datalength))
+                    self.prev5mins.setEnabled(False)
+                    self.next5mins.setEnabled(True)
+                    self.movePrev5minsKey.setEnabled(False)
+                    self.moveNext5minsKey.setEnabled(True)
                 else:
-                    self.placeInFileLabel.setText("Page %d of %d (%d s in page)" % (self.currentFileSection+1, self.nFileSections, self.datalengthSec))
-                self.fileInfoSR.setText("<b>Sampling rate:</b> %d Hz" % self.sampleRate)
-                self.fileInfoNCh.setText("<b>Channels:</b> %d" % self.sp.audioFormat.channelCount())
-                self.fileInfoSS.setText("<b>Bit depth:</b> %d" % self.sp.audioFormat.sampleSize())
-                self.fileInfoDur.setText("<b>Duration:</b> %d min %d s" % divmod(self.sp.fileLength // self.sampleRate, 60))
+                    self.nFileSections = 1
+                    self.prev5mins.setEnabled(False)
+                    self.next5mins.setEnabled(False)
+                    self.movePrev5minsKey.setEnabled(False)
+                    self.moveNext5minsKey.setEnabled(False)
+                print('number of pages: ', self.nFileSections)
 
+            # Update overview info
+            if self.nFileSections == 1:
+                self.placeInFileLabel.setText("(%d s in 1 page)" % self.datalengthSec)
+            else:
+                self.placeInFileLabel.setText("Page %d of %d (%d s in page)" % (self.currentFileSection+1, self.nFileSections, self.datalengthSec))
+            self.fileInfoSR.setText("<b>Sampling rate:</b> %d Hz" % self.sampleRate)
+            self.fileInfoNCh.setText("<b>Channels:</b> %d" % self.sp.audioFormat.channelCount())
+            self.fileInfoSS.setText("<b>Bit depth:</b> %d" % self.sp.audioFormat.sampleSize())
+            self.fileInfoDur.setText("<b>Duration:</b> %d min %d s" % divmod(self.sp.fileLength // self.sampleRate, 60))
+
+            if self.batmode:
+                # sgRaw was already normalized to 0-1 when loading
+                # with 1 being loudest
+                sgRaw = self.sp.sg
+                self.sg = np.abs(np.where(sgRaw == 0, -30, 10*np.log10(sgRaw)))
+            else:
                 # Get the data for the main spectrogram
                 sgRaw = self.sp.spectrogram(self.config['window_width'], self.config['incr'], mean_normalise=self.sgMeanNormalise,
                                             equal_loudness=self.sgEqualLoudness, onesided=self.sgOneSided, multitaper=self.sgMultitaper)
                 maxsg = np.min(sgRaw)
                 self.sg = np.abs(np.where(sgRaw == 0, 0.0, 10.0 * np.log10(sgRaw / maxsg)))
 
-                # ANNOTATIONS: init empty list
-                self.segments = Segment.SegmentList()
-                # Load any previous segments stored
-                if os.path.isfile(self.filename + '.data'):
-                    # populate it, add the metadata attribute
-                    # (note: we're overwriting the JSON duration with actual full wav size)
-                    self.segments.parseJSON(self.filename+'.data', self.sp.fileLength / self.sp.sampleRate)
-                    self.operator = self.segments.metadata["Operator"]
-                    self.reviewer = self.segments.metadata["Reviewer"]
-                    self.segmentsToSave = True
+            # ANNOTATIONS: init empty list
+            self.segments = Segment.SegmentList()
+            # Load any previous segments stored
+            if os.path.isfile(self.filename + '.data'):
+                # populate it, add the metadata attribute
+                # (note: we're overwriting the JSON duration with actual full wav size)
+                self.segments.parseJSON(self.filename+'.data', self.sp.fileLength / self.sp.sampleRate)
+                self.operator = self.segments.metadata["Operator"]
+                self.reviewer = self.segments.metadata["Reviewer"]
+                self.segmentsToSave = True
 
-                    # if there are any multi-species segments,
-                    # switch the option on regardless of user preference
-                    for s in self.segments:
-                        if len(s[4])>1:
-                            self.multipleBirds = True
-                else:
-                    self.segments.metadata = {"Operator": self.operator, "Reviewer": self.reviewer, "Duration": self.sp.fileLength / self.sp.sampleRate}
+                # if there are any multi-species segments,
+                # switch the option on regardless of user preference
+                for s in self.segments:
+                    if len(s[4])>1:
+                        self.multipleBirds = True
+            else:
+                self.segments.metadata = {"Operator": self.operator, "Reviewer": self.reviewer, "Duration": self.sp.fileLength / self.sp.sampleRate}
 
-                self.drawProtocolMarks()
+            # Bat mode: initialize with an empty segment for the entire file
+            if self.batmode and len(self.segments)==0:
+                species = [{"species": "Don't Know", "certainty": 0, "filter": "M"}]
+                newSegment = Segment.Segment([0, self.sp.fileLength / self.sampleRate, 0, 0, species])
+                self.segments.append(newSegment)
+                self.segmentsToSave = True
 
-                self.statusRight.setText("Operator: " + str(self.operator) + ", Reviewer: " + str(self.reviewer))
+            self.drawProtocolMarks()
 
-                if hasattr(self,'seg'):
-                    self.seg.setNewData(self.sp)
-                else:
-                    self.seg = Segment.Segmenter(self.sp, self.sampleRate)
+            self.statusRight.setText("Operator: " + str(self.operator) + ", Reviewer: " + str(self.reviewer))
 
-                # Update the Dialogs
-                if hasattr(self,'spectrogramDialog'):
-                    self.spectrogramDialog.setValues(self.sp.minFreq,self.sp.maxFreq,self.sp.minFreqShow,self.sp.maxFreqShow)
-                if hasattr(self,'denoiseDialog'):
-                    self.denoiseDialog.setValues(self.sp.minFreq,self.sp.maxFreq)
+            if hasattr(self,'seg'):
+                self.seg.setNewData(self.sp)
+            else:
+                self.seg = Segment.Segmenter(self.sp, self.sampleRate)
 
-                # Delete any denoising backups from the previous file
-                if hasattr(self,'audiodata_backup'):
-                    self.audiodata_backup = None
-                self.showFundamental.setChecked(False)
-                self.showEnergies.setChecked(False)
-                self.showSpectral.setChecked(False)
-                if not self.DOC:
-                    self.showInvSpec.setChecked(False)
+            # Update the Dialogs
+            if hasattr(self,'spectrogramDialog'):
+                self.spectrogramDialog.setValues(self.sp.minFreq,self.sp.maxFreq,self.sp.minFreqShow,self.sp.maxFreqShow)
+            if hasattr(self,'denoiseDialog'):
+                self.denoiseDialog.setValues(self.sp.minFreq,self.sp.maxFreq)
 
-                self.timeaxis.setOffset(self.startRead+self.startTime)
+            # Delete any denoising backups from the previous file
+            if hasattr(self,'audiodata_backup'):
+                self.audiodata_backup = None
+            if not self.DOC:
+                self.showInvSpec.setChecked(False)
 
-                # Set the window size
-                self.windowSize = self.config['windowWidth']
-                self.timeaxis.setRange(0, self.windowSize)
-                self.widthWindow.setRange(0.5, self.datalengthSec)
+            self.timeaxis.setOffset(self.startRead+self.startTime)
 
-                # Reset it if the file is shorter than the window
-                if self.datalengthSec < self.windowSize:
-                    self.windowSize = self.datalengthSec
-                self.widthWindow.setValue(self.windowSize)
-                if self.windowSize<3:
-                    self.timeaxis.setShowMS(True)
+            # Set the window size
+            self.windowSize = self.config['windowWidth']
+            self.timeaxis.setRange(0, self.windowSize)
+            self.widthWindow.setRange(0.5, self.datalengthSec)
 
-                self.totalTime = self.convertMillisecs(1000*self.datalengthSec)
+            # Reset it if the file is shorter than the window
+            if self.datalengthSec < self.windowSize:
+                self.windowSize = self.datalengthSec
+            self.widthWindow.setValue(self.windowSize)
+            if self.windowSize<3:
+                self.timeaxis.setShowMS(True)
 
-                # Load the file for playback
-                self.media_obj = SupportClasses.ControllableAudio(self.sp.audioFormat)
-                # this responds to audio output timer
-                self.media_obj.notify.connect(self.movePlaySlider)
-                # Not needed for DOC mode, but easier if it exists
-                # Enable the snail button to play at other speeds
-                oldSR = self.sp.audioFormat.sampleRate()
-                self.sp.audioFormat.setSampleRate(self.sp.audioFormat.sampleRate()//self.slowSpeed)
-                self.media_slow = SupportClasses.ControllableAudio(self.sp.audioFormat)
-                self.sp.audioFormat.setSampleRate(oldSR)
-                self.media_slow.notify.connect(self.movePlaySlowSlider)
+            self.totalTime = self.convertMillisecs(1000*self.datalengthSec)
 
-                # Reset the media player
-                self.stopPlayback()
-                self.volSliderMoved(0)
-                self.segmentStop = 50
-                #self.media_obj.filterSeg(0, 50, self.audiodata)
-                self.volSliderMoved(self.volSlider.value())
+            # Load the file for playback
+            self.media_obj = SupportClasses.ControllableAudio(self.sp.audioFormat)
+            # this responds to audio output timer
+            self.media_obj.notify.connect(self.movePlaySlider)
+            # Not needed for DOC mode, but easier if it exists
+            # Enable the snail button to play at other speeds
+            oldSR = self.sp.audioFormat.sampleRate()
+            self.sp.audioFormat.setSampleRate(self.sp.audioFormat.sampleRate()//self.slowSpeed)
+            self.media_slow = SupportClasses.ControllableAudio(self.sp.audioFormat)
+            self.sp.audioFormat.setSampleRate(oldSR)
+            self.media_slow.notify.connect(self.movePlaySlowSlider)
 
-                # Set the length of the scrollbar.
-                self.scrollSlider.setRange(0,np.shape(self.sg)[0] - self.convertAmpltoSpec(self.widthWindow.value()))
-                self.scrollSlider.setValue(0)
+            # Reset the media player
+            self.stopPlayback()
+            self.volSliderMoved(0)
+            self.segmentStop = 50
+            #self.media_obj.filterSeg(0, 50, self.audiodata)
+            self.volSliderMoved(self.volSlider.value())
 
-                self.drawOverview()
-                dlg += 1
-                dlg.update()
-                self.drawfigMain()
-                self.setWindowTitle('AviaNZ - Manual Processing ' + self.filename)
-                dlg += 1
-                dlg.update()
-                self.statusLeft.setText("Ready")
+            # Set the length of the scrollbar.
+            self.scrollSlider.setRange(0,np.shape(self.sg)[0] - self.convertAmpltoSpec(self.widthWindow.value()))
+            self.scrollSlider.setValue(0)
+
+            self.drawOverview()
+            dlg += 1
+            dlg.update()
+            self.drawfigMain()
+            self.setWindowTitle('AviaNZ - Manual Processing ' + self.filename)
+            dlg += 1
+            dlg.update()
+            self.statusLeft.setText("Ready")
 
     def openNextFile(self):
         """ Listener for next file >> button.
@@ -1865,7 +1965,9 @@ class AviaNZ(QMainWindow):
         """ Draws the main amplitude and spectrogram plots and any segments on them.
         Has to do some work to get the axis labels correct.
         """
-        self.amplPlot.setData(np.linspace(0.0,self.datalengthSec,num=self.datalength,endpoint=True),self.audiodata)
+        if len(self.audiodata)>0:
+            self.amplPlot.setData(np.linspace(0.0,self.datalengthSec,num=self.datalength,endpoint=True),self.audiodata)
+
         self.timeaxis.setLabel('')
 
         height = self.sampleRate // 2 / np.shape(self.sg)[1]
@@ -2348,7 +2450,7 @@ class AviaNZ(QMainWindow):
 
         if not saveSeg:
             timeRangeStart = self.startRead
-            timeRangeEnd = min(self.startRead + self.lenRead, self.sp.fileLength / self.sampleRate)
+            timeRangeEnd = self.startRead + self.datalengthSec
 
             # check if this segment fits in the current spectrogram page
             if endpoint < timeRangeStart or startpoint > timeRangeEnd:
@@ -2411,7 +2513,13 @@ class AviaNZ(QMainWindow):
 
         # full-height segments:
         if y1==0 and y2==0:
-            p_spec_r = SupportClasses.LinearRegionItem2(self, brush=self.prevBoxCol, movable=segsMovable, bounds=[0, np.shape(self.sg)[0]])
+            # filled-in segments normally, transparent ones for bats:
+            p_spec_r = None
+            if not self.batmode:
+                p_spec_r = SupportClasses.LinearRegionItem2(self, brush=self.prevBoxCol, movable=segsMovable, bounds=[0, np.shape(self.sg)[0]])
+            else:
+                p_spec_r = SupportClasses.LinearRegionItem2(self, pen=pg.mkPen(self.prevBoxCol, width=6), movable=segsMovable, bounds=[0, np.shape(self.sg)[0]])
+                p_spec_r.setBrush(None)
             p_spec_r.setRegion([self.convertAmpltoSpec(startpoint), self.convertAmpltoSpec(endpoint)])
         # rectangle boxes:
         else:
@@ -2499,14 +2607,23 @@ class AviaNZ(QMainWindow):
         if boxid>len(self.listRectanglesa1) or self.listRectanglesa1[boxid] is None:
             return
 
+        # filled-in segments normally, transparent ones for bats:
+        # (This is somewhat convoluted to keep amplitude segments updated even in bat mode,
+        # as they are used for tracking prevBoxCol)
         col = self.prevBoxCol
         col.setAlpha(100)
         self.listRectanglesa1[boxid].setBrush(fn.mkBrush(col))
-        self.listRectanglesa2[boxid].setBrush(fn.mkBrush(col))
+        if not self.batmode:
+            self.listRectanglesa2[boxid].setBrush(fn.mkBrush(col))
+        else:
+            self.listRectanglesa2[boxid].setBrush(None)
+            self.listRectanglesa2[boxid].setPen(self.prevBoxCol, width=6)
+
         col.setAlpha(180)
         self.listRectanglesa1[boxid].setHoverBrush(fn.mkBrush(col))
         self.listRectanglesa2[boxid].setHoverBrush(fn.mkBrush(col))
         col.setAlpha(100)
+
         if self.config['transparentBoxes'] and type(self.listRectanglesa2[boxid]) == self.ROItype:
             col = self.prevBoxCol.rgb()
             col = QtGui.QColor(col)
@@ -3117,6 +3234,9 @@ class AviaNZ(QMainWindow):
         # we should just store the new color (it'll be used on deselecting)
         if self.box1id == segID:
             self.prevBoxCol = brush
+            # Except in batmode where lines are still visible when selected:
+            if self.batmode:
+                self.listRectanglesa2[segID].setPen(brush, width=6)
         # otherwise actually redraw the segment/box:
         else:
             if self.listRectanglesa2[segID] is None:
@@ -3125,10 +3245,16 @@ class AviaNZ(QMainWindow):
             col = QtGui.QColor(brush)
             col.setAlpha(100)
             self.listRectanglesa1[segID].setBrush(col)
-            self.listRectanglesa2[segID].setBrush(col)
+            if not self.batmode:
+                self.listRectanglesa2[segID].setBrush(col)
+            else:
+                self.listRectanglesa2[segID].setBrush(None)
+                self.listRectanglesa2[segID].setPen(brush, width=6)
+
             col.setAlpha(180)
             self.listRectanglesa1[segID].setHoverBrush(fn.mkBrush(col))
             self.listRectanglesa2[segID].setHoverBrush(fn.mkBrush(col))
+
             if type(self.listRectanglesa2[segID]) == self.ROItype:
                 self.listRectanglesa2[segID].transparent = False
                 self.listRectanglesa2[segID].setPen(None)
@@ -3790,19 +3916,25 @@ class AviaNZ(QMainWindow):
                         x2nob = min(seg[1], x2)
 
                         # Load
-                        sp.readWav(self.filename, off=x1, len=x2-x1, silent=True)
+                        if self.batmode:
+                            # Read in the spectrogram piece
+                            sp.readBmp(self.filename, off=x1, len=x2-x1, silent=True)
+                            # sgRaw was already normalized to 0-1 when loading
+                            # with 1 being loudest
+                            sgRaw = sp.sg
+                            sp.sg = np.abs(np.where(sgRaw == 0, -30, 10*np.log10(sgRaw)))
+                        else:
+                            # Read audio and generate the spectrogram
+                            sp.readWav(self.filename, off=x1, len=x2-x1, silent=True)
+                            _ = sp.spectrogram(window='Hann', mean_normalise=True, onesided=True,multitaper=False, need_even=False)
+                            # collect min and max values for final colour scale
+                            minsg = np.min(sp.sg)
+                            sp.sg = np.abs(np.where(sp.sg==0, 0.0, 10.0 * np.log10(sp.sg/minsg)))
 
                         # need to also store unbuffered limits in spec units
                         # (relative to start of segment)
                         sp.x1nobspec = sp.convertAmpltoSpec(x1nob-x1)
                         sp.x2nobspec = sp.convertAmpltoSpec(x2nob-x1)
-
-                        # Generate the spectrogram
-                        _ = sp.spectrogram(window='Hann', mean_normalise=True, onesided=True,multitaper=False, need_even=False)
-
-                        # collect min and max values for final colour scale
-                        minsg = np.min(sp.sg)
-                        sp.sg = np.abs(np.where(sp.sg==0, 0.0, 10.0 * np.log10(sp.sg/minsg)))
                     else:
                         sp = None
 
@@ -4886,6 +5018,10 @@ class AviaNZ(QMainWindow):
         """ Listener for button to play the visible area.
         On PLAY, turns to PAUSE and two other buttons turn to STOPs.
         """
+        if self.batmode:
+            # Currently playback disabled in this mode - also takes care of spacebar signal
+            return
+
         if self.media_obj.isPlaying() or self.media_slow.isPlaying():
             self.pausePlayback()
         else:
@@ -5390,7 +5526,7 @@ class AviaNZ(QMainWindow):
                 self.reviewer = data
                 self.statusRight.setText("Operator: " + str(self.operator) + ", Reviewer: " + str(self.reviewer))
             elif childName=='Bird List.Common Bird List.Choose File':
-                filename, drop = QtGui.QFileDialog.getOpenFileName(self, 'Choose File', self.SoundFileDir, "Text files (*.txt)")
+                filename, drop = QFileDialog.getOpenFileName(self, 'Choose File', self.SoundFileDir, "Text files (*.txt)")
                 if filename == '':
                     print("no list file selected")
                     return
@@ -5402,7 +5538,7 @@ class AviaNZ(QMainWindow):
                     else:
                         self.shortBirdList = self.ConfigLoader.shortbl(self.config['BirdListShort'], self.configdir)
             elif childName=='Bird List.Full Bird List.Choose File':
-                filename, drop = QtGui.QFileDialog.getOpenFileName(self, 'Choose File', self.SoundFileDir, "Text files (*.txt)")
+                filename, drop = QFileDialog.getOpenFileName(self, 'Choose File', self.SoundFileDir, "Text files (*.txt)")
                 if filename == '':
                     print("no list file selected")
                     return
@@ -5421,7 +5557,7 @@ class AviaNZ(QMainWindow):
                     #self.longBirdList = None
                 #else:
                     #if self.p['Bird List','Full Bird List','Filename'] is None or self.p['Bird List','Full Bird List','Filename'] == '' or self.p['Bird List','Full Bird List','Filename'] == 'None':
-                        #filename, drop = QtGui.QFileDialog.getOpenFileName(self, 'Choose File', self.SoundFileDir, "Text files (*.txt)")
+                        #filename, drop = QFileDialog.getOpenFileName(self, 'Choose File', self.SoundFileDir, "Text files (*.txt)")
                         #if filename == '':
                             #print("no list file selected")
                             #return

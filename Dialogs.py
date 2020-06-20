@@ -1468,7 +1468,12 @@ class HumanClassify1(QDialog):
         self.bar.setValue(0)
         if maxFreq==0:
             maxFreq = sampleRate / 2
-        self.duration = len(audiodata) / sampleRate * 1000 # in ms
+        self.duration = len(audiodata) / sampleRate * 1000  # in ms
+
+        # Update UI if no audio (e.g. batmode)
+        self.playButton.setEnabled(len(audiodata))
+        self.volIcon.setEnabled(len(audiodata))
+        self.volSlider.setEnabled(len(audiodata))
 
         # fill up a rectangle with dark grey to act as background if the segment is small
         sg2 = sg
@@ -1953,6 +1958,8 @@ class HumanClassify2(QDialog):
         # let the user quit without bothering rest of it
 
         self.sps = sps
+        # Check if playback is possible (e.g. for batmode):
+        haveaudio = all([len(sp.data)>0 for sp in sps if sp is not None])
 
         self.lut = lut
         self.colourStart = colourStart
@@ -1982,6 +1989,10 @@ class HumanClassify2(QDialog):
         self.volIcon.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
         self.volIcon.setPixmap(QPixmap('img/volume.png').scaled(18, 18, transformMode=1))
         #self.volIcon.setStyleSheet("padding: 0px 1px 0px 8px")
+
+        if not haveaudio:
+            self.volSlider.setEnabled(False)
+            self.volIcon.setEnabled(False)
 
         # Brightness and contrast sliders - need to pass true (config) values of these as args
         self.brightnessSlider = QSlider(Qt.Horizontal)

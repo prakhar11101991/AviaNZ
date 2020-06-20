@@ -376,6 +376,10 @@ class LinearRegionItem2(pg.LinearRegionItem):
     def setHoverBrush(self, *br, **kargs):
         self.hoverBrush = fn.mkBrush(*br, **kargs)
 
+    def setPen(self, *pen, **kargs):
+        self.lines[0].setPen(*pen, **kargs)
+        self.lines[1].setPen(*pen, **kargs)
+
     def mouseDragEvent(self, ev):
         if not self.movable or ev.button()==self.parent.MouseDrawingButton:
             return
@@ -1334,6 +1338,17 @@ class PicButton(QAbstractButton):
         self.unbufStop = unbufStop
         self.cluster = cluster
         self.setMouseTracking(True)
+
+        self.playButton = QtGui.QToolButton(self)
+        self.playButton.setIcon(self.style().standardIcon(QtGui.QStyle.SP_MediaPlay))
+        self.playButton.hide()
+        # check if playback possible (e.g. batmode)
+        if len(audiodata)>0:
+            self.noaudio = False
+            self.playButton.clicked.connect(self.playImage)
+        else:
+            self.noaudio = True
+
         # setImage reads some properties from self, to allow easy update
         # when color map changes
         self.setImage(lut, colStart, colEnd, cmapInv)
@@ -1349,12 +1364,7 @@ class PicButton(QAbstractButton):
         self.media_obj = ControllableAudio(format)
         self.media_obj.notify.connect(self.endListener)
         self.audiodata = audiodata
-        self.duration = duration * 1000 # in ms
-
-        self.playButton = QtGui.QToolButton(self)
-        self.playButton.setIcon(self.style().standardIcon(QtGui.QStyle.SP_MediaPlay))
-        self.playButton.clicked.connect(self.playImage)
-        self.playButton.hide()
+        self.duration = duration * 1000  # in ms
 
     def setImage(self, lut, colStart, colEnd, cmapInv):
         # takes in a piece of spectrogram and produces a pair of images
@@ -1367,14 +1377,20 @@ class PicButton(QAbstractButton):
             print("ERROR: button not shown, likely bad spectrogram coordinates")
             return
 
+        # Output image width - larger for batmode:
+        if self.noaudio:
+            targwidth = 750
+        else:
+            targwidth = 500
+
         # hardcode all image sizes
         if self.cluster:
             self.im1 = im1.scaled(200, 150)
         else:
-            self.specReductionFact = im1.size().width()/500
+            self.specReductionFact = im1.size().width()/targwidth
             # use original height if it is not extreme
             prefheight = max(192, min(im1.size().height(), 512))
-            self.im1 = im1.scaled(500, prefheight)
+            self.im1 = im1.scaled(targwidth, prefheight)
 
         # draw lines
         if not self.cluster:
@@ -1429,11 +1445,15 @@ class PicButton(QAbstractButton):
 
     def enterEvent(self, QEvent):
         # to reset the icon if it didn't stop cleanly
+        if self.noaudio:
+            return
         if not self.media_obj.isPlaying():
             self.playButton.setIcon(self.style().standardIcon(QtGui.QStyle.SP_MediaPlay))
         self.playButton.show()
 
     def leaveEvent(self, QEvent):
+        if self.noaudio:
+            return
         if not self.media_obj.isPlaying():
             self.playButton.hide()
 
@@ -1549,7 +1569,7 @@ class LightedFileList(QListWidget):
 
         with pg.BusyCursor():
             # Read contents of current dir
-            self.listOfFiles = QDir(soundDir).entryInfoList(['..','*.wav'],filters=QDir.AllDirs | QDir.NoDot | QDir.Files,sort=QDir.DirsFirst)
+            self.listOfFiles = QDir(soundDir).entryInfoList(['..','*.wav','*.bmp'],filters=QDir.AllDirs | QDir.NoDot | QDir.Files,sort=QDir.DirsFirst)
             self.soundDir = soundDir
 
             for file in self.listOfFiles:
@@ -1557,32 +1577,45 @@ class LightedFileList(QListWidget):
                 item = QListWidgetItem(self)
 
                 if file.isDir():
+                    if file.fileName()=="..":
+                        item.setText(file.fileName() + "/")
+                        continue
+
                     # detailed dir view can be used for non-clickable instances
-                    if addWavNum and file.fileName()!="..":
+                    if addWavNum:
                         # count wavs in this dir:
+                        numbmps = 0
                         numwavs = 0
                         for root, dirs, files in os.walk(file.filePath()):
                             numwavs += sum(f.lower().endswith('.wav') for f in files)
-                        item.setText("%s/\t\t(%d wav files)" % (file.fileName(), numwavs))
+                            numbmps += sum(f.lower().endswith('.bmp') for f in files)
+                        # keep these strings as short as possible
+                        if numbmps==0:
+                            item.setText("%s/\t\t(%d wav files)" % (file.fileName(), numwavs))
+                        elif numwavs==0:
+                            item.setText("%s/\t\t(%d bmp files)" % (file.fileName(), numbmps))
+                        else:
+                            item.setText("%s/\t\t(%d wav, %d bmp files)" % (file.fileName(), numwavs, numbmps))
                     else:
                         item.setText(file.fileName() + "/")
 
                     # We still might need to walk the subfolders for sp lists and wav formats!
                     if not recursive:
                         continue
-                    if file.fileName()=="..":
-                        continue
                     for root, dirs, files in os.walk(file.filePath()):
                         for filename in files:
                             filenamef = os.path.join(root, filename)
-                            if filename.lower().endswith('.wav'):
-                                if readFmt:
+                            if filename.lower().endswith('.wav') or filename.lower().endswith('.bmp'):
+                                # format collection only implemented for WAVs currently
+                                if readFmt and filename.lower().endswith('.wav'):
                                     try:
                                         samplerate = wavio.readFmt(filenamef)[0]
                                         self.fsList.add(samplerate)
                                     except Exception as e:
                                         print("Warning: could not parse format of WAV file", filenamef)
                                         print(e)
+
+                                # Data files can accompany either wavs or bmps
                                 dataf = filenamef + '.data'
                                 if os.path.isfile(dataf):
                                     try:
@@ -1608,7 +1641,8 @@ class LightedFileList(QListWidget):
                     fullname = os.path.join(soundDir, file.fileName())
                     # (also updates the directory info sets, and minCertainty)
                     self.paintItem(item, fullname+'.data')
-                    if readFmt:
+                    # format collection only implemented for WAVs currently
+                    if readFmt and file.fileName().lower().endswith('.wav'):
                         try:
                             samplerate = wavio.readFmt(fullname)[0]
                             self.fsList.add(samplerate)
@@ -1626,7 +1660,6 @@ class LightedFileList(QListWidget):
                 self.setCurrentItem(index[0])
             else:
                 self.setCurrentRow(0)
-
 
     def refreshFile(self, fileName):
         """ Repaint a single file icon.

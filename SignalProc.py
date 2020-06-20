@@ -29,6 +29,7 @@ import librosa
 import copy
 import gc
 
+from PyQt5.QtGui import QImage
 from PyQt5.QtMultimedia import QAudioFormat
 # for multitaper spec:
 from spectrum import dpss, pmtm
@@ -90,6 +91,78 @@ class SignalProc:
 
         if not silent:
             print("Detected format: %d channels, %d Hz, %d bit samples" % (self.audioFormat.channelCount(), self.audioFormat.sampleRate(), self.audioFormat.sampleSize()))
+
+    def readBmp(self, file, len=None, off=0, silent=False):
+        """ Reads DOC-standard bat recordings in 8x row-compressed BMP format.
+            For similarity with readWav, accepts len and off args, in seconds.
+        """
+        # Important:
+        # CHANGE INCR HERE IF DEFAULT ONE ON SELF IS NOT CORRECT
+        # self.incr = incr
+        # TODO get this sorted
+        self.sampleRate = 16000
+
+        img = QImage(file, "BMP")
+        h = img.height()
+        w = img.width()
+        colc = img.colorCount()
+        if h==0 or w==0:
+            print("ERROR: image was not loaded")
+            return
+
+        # Check color format and convert to grayscale
+        print("img format", img.format())
+        if not silent and (not img.allGray() or colc>256):
+            print("Warning: image provided not in 8-bit grayscale, information will be lost")
+        img.convertTo(QImage.Format_Grayscale8)
+
+        # Convert to numpy
+        # (remember that pyqtgraph images are column-major)
+        ptr = img.constBits()
+        ptr.setsize(h*w*1)
+        img2 = np.array(ptr).reshape(h, w)
+
+        # TODO commented out for now - maybe this is useful for establishing contrast?
+        # img2[:, -1] = 254   # cut last row
+        img2 = np.repeat(img2, 8, axis=1)  # repeat rows 7 times to fit invertspectrogram
+        img2 = np.rot90(img2, 2)  # rotate 180*
+        img2 = img2[1:, : ]  # Cutting first column because it only contains the scale
+
+        img2 = 254.0 * np.ones(np.shape(img2)) - img2  # reverse value having the black as the most intense
+        img2 = img2/np.max(img2)  # normalization
+
+        # NOTE: conversions will use self.sampleRate and self.incr, so ensure those are already set!
+        # trim to specified offset and length:
+        if off>0 or len is not None:
+            # Convert offset from seconds to pixels
+            off = int(self.convertAmpltoSpec(off))
+            if len is None:
+                img2 = img2[off:, :]
+            else:
+                # Convert length from seconds to pixels:
+                len = int(self.convertAmpltoSpec(len))
+                img2 = img2[off:(off+len),:]
+
+        if not silent:
+            print(np.shape(img2))
+            print(img2)
+
+        self.sg = img2
+
+        self.data = []
+        self.fileLength = (h-2)*self.incr + self.window_width  # (in samples)
+
+        self.audioFormat.setChannelCount(0)
+        self.audioFormat.setSampleSize(0)
+        self.audioFormat.setSampleRate(self.sampleRate)
+
+        self.minFreq = 0
+        self.maxFreq = self.sampleRate //2
+        self.minFreqShow = max(self.minFreq, self.minFreqShow)
+        self.maxFreqShow = min(self.maxFreq, self.maxFreqShow)
+
+        if not silent:
+            print("Detected BMP format: %d x %d px, %d colours" % (w, h, colc))
 
     def resample(self, target):
         if len(self.data)==0:
