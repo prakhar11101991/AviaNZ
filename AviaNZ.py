@@ -865,6 +865,10 @@ class AviaNZ(QMainWindow):
         self.bar = pg.InfiniteLine(angle=90, movable=True, pen={'color': 'c', 'width': 3})
         self.bar.btn = self.MouseDrawingButton
 
+        # guides that can be used in batmode
+        self.guide1 = pg.InfiniteLine(angle=0, movable=False, pen={'color': 'y', 'width': 2})
+        self.guide2 = pg.InfiniteLine(angle=0, movable=False, pen={'color': 'y', 'width': 2})
+
         # A slider to move through the file easily
         self.scrollSlider = QScrollBar(Qt.Horizontal)
         self.scrollSlider.valueChanged.connect(self.scroll)
@@ -1859,10 +1863,9 @@ class AviaNZ(QMainWindow):
             sgy = np.shape(self.sg)[1]
         return y * self.sampleRate//2 / sgy + self.sp.minFreqShow
 
-    def convertFreqtoY(self,f,sgy=None):
+    def convertFreqtoY(self,f):
         """ Unit conversion """
-        if sgy is None:
-            sgy = np.shape(self.sg)[1]
+        sgy = np.shape(self.sg)[1]
         return (f-self.sp.minFreqShow) * sgy / (self.sampleRate//2)
 
     def drawOverview(self):
@@ -1987,6 +1990,17 @@ class AviaNZ(QMainWindow):
         height = self.sampleRate // 2 / np.shape(self.sg)[1]
         SpecRange = FreqRange/height
 
+        # Frequency guides for bat mode
+        if self.batmode:
+            self.guide1.setValue(self.convertFreqtoY(5000))
+            self.guide2.setValue(self.convertFreqtoY(7000))
+            self.p_spec.addItem(self.guide1, ignoreBounds=True)
+            self.p_spec.addItem(self.guide2, ignoreBounds=True)
+        else:
+            # easy way to hide
+            self.guide1.setValue(-10)
+            self.guide2.setValue(-10)
+
         if self.zooniverse:
             offset=6
             txt='<span style="color: #0F0; font-size:20pt">%s</div>'%str(0)
@@ -2030,7 +2044,7 @@ class AviaNZ(QMainWindow):
                 if self.segments[count][2] == 0 and self.segments[count][3] == 0:
                     self.addSegment(self.segments[count][0], self.segments[count][1], 0, 0, self.segments[count][4], False, count, remaking)
                 else:
-                    self.addSegment(self.segments[count][0], self.segments[count][1], self.convertFreqtoY(self.segments[count][2]),self.convertFreqtoY(self.segments[count][3]), self.segments[count][4], False, count, remaking)
+                    self.addSegment(self.segments[count][0], self.segments[count][1], self.segments[count][2], self.segments[count][3], self.segments[count][4], False, count, remaking)
 
             # This is the moving bar for the playback
             if not hasattr(self,'bar'):
@@ -2424,15 +2438,13 @@ class AviaNZ(QMainWindow):
         If a segment is too long for the current section, truncates it.
         Args:
         startpoint, endpoint are in amplitude coordinates
-        y1, y2 should be standard y coordinates (between 0 and 1)
+        y1, y2 should be the frequencies (between 0 and Fs//2)
         species - list of labels (including certainties, .data format)
         saveSeg means that we are drawing the saved ones. Need to check that those ones fit into
           the current window, can assume the other do, but have to save their times correctly.
         remaking - can be turned to True to reuse some existing objects
         """
-        print("Segment added at %d-%d, %d-%d" % (startpoint, endpoint, self.convertYtoFreq(y1), self.convertYtoFreq(y2)))
-        miny = self.convertFreqtoY(self.sp.minFreqShow)
-        maxy = self.convertFreqtoY(self.sp.maxFreqShow)
+        print("Segment added at %d-%d, %d-%d" % (startpoint, endpoint, y1, y2))
 
         # Make sure startpoint and endpoint are in the right order
         if startpoint > endpoint:
@@ -2456,7 +2468,7 @@ class AviaNZ(QMainWindow):
             if endpoint < timeRangeStart or startpoint > timeRangeEnd:
                 print("Warning: a segment was not shown")
                 show = False
-            elif y1!=0 and y2!=0 and (y1 > maxy or y2 < miny):
+            elif y1!=0 and y2!=0 and (y1 > self.sp.maxFreqShow or y2 < self.sp.minFreqShow):
                 print("Warning: a segment was not shown")
                 show = False
             else:
@@ -2482,10 +2494,7 @@ class AviaNZ(QMainWindow):
         # otherwise, this is a visible segment.
         # create a Segment. this will check for errors and standardize the labels
         # Note - we convert time from _relative to page_ to _relative to file start_
-        if y1==0 and y2==0:
-            newSegment = Segment.Segment([startpoint+self.startRead, endpoint+self.startRead, y1, y2, species])
-        else:
-            newSegment = Segment.Segment([startpoint+self.startRead, endpoint+self.startRead, self.convertYtoFreq(y1), self.convertYtoFreq(y2), species])
+        newSegment = Segment.Segment([startpoint+self.startRead, endpoint+self.startRead, y1, y2, species])
 
         # Add the segment to the data
         if saveSeg:
@@ -2523,8 +2532,10 @@ class AviaNZ(QMainWindow):
             p_spec_r.setRegion([self.convertAmpltoSpec(startpoint), self.convertAmpltoSpec(endpoint)])
         # rectangle boxes:
         else:
-            startpointS = QPointF(self.convertAmpltoSpec(startpoint),max(y1,miny))
-            endpointS = QPointF(self.convertAmpltoSpec(endpoint),min(y2,maxy))
+            specy1 = self.convertFreqtoY(max(y1, self.sp.minFreqShow))
+            specy2 = self.convertFreqtoY(min(y2, self.sp.maxFreqShow))
+            startpointS = QPointF(self.convertAmpltoSpec(startpoint), specy1)
+            endpointS = QPointF(self.convertAmpltoSpec(endpoint), specy2)
             p_spec_r = SupportClasses.ShadedRectROI(startpointS, endpointS - startpointS, movable=segsMovable, maxBounds=scenerect, parent=self)
             if self.config['transparentBoxes']:
                 col = self.prevBoxCol.rgb()
@@ -2854,6 +2865,9 @@ class AviaNZ(QMainWindow):
                     if np.abs((x2-x1)*(y2-y1)) < self.minboxsize:
                         print("Small box detected, ignoring")
                         return
+
+                    y1 = self.convertYtoFreq(y1)
+                    y2 = self.convertYtoFreq(y2)
                 else:
                     y1 = 0
                     y2 = 0
@@ -3544,11 +3558,23 @@ class AviaNZ(QMainWindow):
         x3 = max(x3, 0)
         x4 = int((self.listRectanglesa1[self.box1id].getRegion()[1] + self.config['reviewSpecBuffer']) * self.sampleRate)
         x4 = min(x4, self.datalength)
+
+        # TODO MOVE TO BATCH MODE
+        # if in batmode, calculate guide line frequencies (not Y in case the shown specs are different sized)
+        if self.guide1.value()>0:
+            guide1y = self.guide1.value()
+        else:
+            guide1y = None
+        if self.guide2.value()>0:
+            guide2y = self.guide2.value()
+        else:
+            guide2y = None
+
         # NOTE: might be good to pass copy.deepcopy(seg[4])
         # instead of seg[4], if any bugs come up due to Dialog1 changing the label
         self.humanClassifyDialog1.setImage(self.sg[x1:x2, :], self.audiodata[x3:x4], self.sampleRate, self.config['incr'],
                                     seg[4], x1nob-x1, x2nob-x1,
-                                    seg[0], seg[1], self.sp.minFreq, self.sp.maxFreq)
+                                    seg[0], seg[1], guide1y, guide2y, self.sp.minFreq, self.sp.maxFreq)
 
     def humanClassifyPrevImage(self):
         """ Go back one image by changing boxid and calling NextImage.
@@ -3940,13 +3966,24 @@ class AviaNZ(QMainWindow):
 
                     sps.append(sp)
 
+            # if in batmode, calculate guide line frequencies (not Y in case the shown specs are different sized)
+            if self.guide1.value()>0:
+                guide1freq = self.convertYtoFreq(self.guide1.value())
+            else:
+                guide1freq = None
+            if self.guide2.value()>0:
+                guide2freq = self.convertYtoFreq(self.guide2.value())
+            else:
+                guide2freq = None
+
             # main dialog:
             # Note: always showing only the current page
             # For now we're passing in all the segments, and it'll select the ones for this sp
             self.humanClassifyDialog2 = Dialogs.HumanClassify2(sps, self.segments, indices2show,
                                                                self.revLabel, self.lut, self.colourStart,
                                                                self.colourEnd, self.config['invertColourMap'],
-                                                               self.config['brightness'], self.config['contrast'])
+                                                               self.config['brightness'], self.config['contrast'],
+                                                               guide1freq=guide1freq, guide2freq=guide2freq)
             if hasattr(self, 'humanClassifyDialogSize'):
                 self.humanClassifyDialog2.resize(self.humanClassifyDialogSize)
             self.humanClassifyDialog2.finish.clicked.connect(self.humanClassifyClose2)
@@ -4804,9 +4841,8 @@ class AviaNZ(QMainWindow):
             if str(alg)=='Wavelets':
                 for filtix in range(len(speciesData['Filters'])):
                     speciesSubf = speciesData['Filters'][filtix]
-                    y1 = self.convertFreqtoY(speciesSubf['FreqRange'][0])
+                    y1 = speciesSubf['FreqRange'][0]
                     y2 = min(self.sampleRate//2, speciesSubf['FreqRange'][1])
-                    y2 = self.convertFreqtoY(y2)
                     for seg in newSegments[filtix]:
                         self.addSegment(float(seg[0][0]), float(seg[0][1]), y1, y2,
                                 [{"species": filtspecies, "certainty": seg[1], "filter": filtname, "calltype": speciesSubf["calltype"]}], index=-1)
@@ -4814,9 +4850,8 @@ class AviaNZ(QMainWindow):
             elif str(alg)=='Cross-Correlation' and species_cc != 'Choose species...':
                 for filtix in range(len(speciesData['Filters'])):
                     speciesSubf = speciesData['Filters'][filtix]
-                    y1 = self.convertFreqtoY(speciesSubf['FreqRange'][0])
+                    y1 = speciesSubf['FreqRange'][0]
                     y2 = min(self.sampleRate//2, speciesSubf['FreqRange'][1])
-                    y2 = self.convertFreqtoY(y2)
                     for seg in newSegments[filtix]:
                         self.addSegment(float(seg[0]), float(seg[1]), y1, y2,
                                 [{"species": species_cc.title(), "certainty": seg[1]}], index=-1)
@@ -4842,10 +4877,7 @@ class AviaNZ(QMainWindow):
 
         self.removeSegments()
         for seg in self.prevSegments:
-            if seg[2] == 0 and seg[3] == 0:
-                self.addSegment(seg[0], seg[1],0,0,seg[4], index=-1)
-            else:
-                self.addSegment(seg[0], seg[1],self.convertFreqtoY(seg[2]),self.convertFreqtoY(seg[3]),seg[4], index=-1)
+            self.addSegment(seg[0], seg[1], seg[2], seg[3], seg[4], index=-1)
             self.segmentsToSave = True
 
     def exportSeg(self):

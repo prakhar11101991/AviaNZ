@@ -186,6 +186,11 @@ class SignalProc:
         """ Unit conversion, for easier use wherever spectrograms are needed """
         return x*self.sampleRate/self.incr
 
+    def convertFreqtoY(self,f):
+        """ Unit conversion """
+        sgy = np.shape(self.sg)[1]
+        return (f-self.minFreqShow) * sgy / (self.sampleRate//2)
+
     def setWidth(self,window_width,incr):
         # Does what it says. Called when the user modifies the spectrogram parameters
         self.window_width = window_width
