@@ -106,6 +106,9 @@ class AviaNZ(QMainWindow):
         self.longBirdList = self.ConfigLoader.longbl(self.config['BirdListLong'], configdir)
         if self.longBirdList is None:
             sys.exit()
+        self.batList = self.ConfigLoader.batl(self.config['BatList'], configdir)
+        if self.batList is None:
+            sys.exit()
 
         # avoid comma/point problem in number parsing
         QLocale.setDefault(QLocale(QLocale.English, QLocale.NewZealand))
@@ -1127,69 +1130,103 @@ class AviaNZ(QMainWindow):
                     # update check marks based on this segment
                     if "calltype" in lab and lab["calltype"]==ct:
                         ctitem.setChecked(True)
-
         else:
-            # otherwise, fill the species list
-            # Put the selected bird name at the top of the list:
-            if self.config['ReorderList'] and hasattr(self,'segments') and self.box1id>-1:
-                for key in self.segments[self.box1id].keys:
-                    # Either move the label to the top of the list, or delete the last
-                    if key[0] in self.shortBirdList:
-                        self.shortBirdList.remove(key[0])
+            # otherwise, fill the (correct) species list
+            if self.batmode:
+                # Put the selected bird name at the top of the list:
+                if self.config['ReorderList'] and hasattr(self,'segments') and self.box1id>-1:
+                    for key in self.segments[self.box1id].keys:
+                        # Either move the label to the top of the list, or delete the last
+                        if key[0] in self.batList:
+                            self.batList.remove(key[0])
+                        else:
+                            del self.batList[-1]
+                        self.batList.insert(0,key[0])
+
+                # create menu items and mark them
+                # (we assume that bat list is always short enough to fit in one column)
+                for item in self.batList:
+                    # Add ? marks if Ctrl menu is called
+                    itemorig = item
+                    if unsure and item != "Don't Know":
+                        cert = 50
+                        item = item+'?'
+                    elif item == "Don't Know":
+                        cert = 0
                     else:
-                        del self.shortBirdList[-1]
-                    self.shortBirdList.insert(0,key[0])
+                        cert = 100
 
-            # create menu items and mark them
-            for item in self.shortBirdList[:15]:
-                # Add ? marks if Ctrl menu is called
-                itemorig = item
-                if unsure and item != "Don't Know":
-                    cert = 50
-                    item = item+'?'
-                elif item == "Don't Know":
-                    cert = 0
-                else:
-                    cert = 100
+                    # Transform > marks
+                    pos = item.find('>')
+                    if pos > -1:
+                        item = item[:pos] + ' (' + item[pos+1:] + ')'
 
-                # Transform > marks
-                pos = item.find('>')
-                if pos > -1:
-                    item = item[:pos] + ' (' + item[pos+1:] + ')'
+                    bird = self.menuBirdList.addAction(item)
+                    bird.setCheckable(True)
+                    if hasattr(self,'segments') and self.segments[self.box1id].hasLabel(itemorig, cert):
+                        bird.setChecked(True)
+                    self.menuBirdList.addAction(bird)
+            else:
+                # Put the selected bird name at the top of the list:
+                if self.config['ReorderList'] and hasattr(self,'segments') and self.box1id>-1:
+                    for key in self.segments[self.box1id].keys:
+                        # Either move the label to the top of the list, or delete the last
+                        if key[0] in self.shortBirdList:
+                            self.shortBirdList.remove(key[0])
+                        else:
+                            del self.shortBirdList[-1]
+                        self.shortBirdList.insert(0,key[0])
 
-                bird = self.menuBirdList.addAction(item)
-                bird.setCheckable(True)
-                if hasattr(self,'segments') and self.segments[self.box1id].hasLabel(itemorig, cert):
-                    bird.setChecked(True)
-                self.menuBirdList.addAction(bird)
-            self.menuBirdList.addMenu(self.menuBird2)
-            for item in self.shortBirdList[15:]:
-                itemorig = item
-                # Add ? marks if Ctrl menu is called
-                if unsure and item != "Don't Know" and item != "Other":
-                    cert = 50
-                    item = item+'?'
-                elif item == "Don't Know":
-                    cert = 0
-                else:
-                    cert = 100
+                # create menu items and mark them
+                for item in self.shortBirdList[:15]:
+                    # Add ? marks if Ctrl menu is called
+                    itemorig = item
+                    if unsure and item != "Don't Know":
+                        cert = 50
+                        item = item+'?'
+                    elif item == "Don't Know":
+                        cert = 0
+                    else:
+                        cert = 100
 
-                # Transform > marks
-                pos = item.find('>')
-                if pos > -1:
-                    item = item[:pos] + ' (' + item[pos+1:] + ')'
+                    # Transform > marks
+                    pos = item.find('>')
+                    if pos > -1:
+                        item = item[:pos] + ' (' + item[pos+1:] + ')'
 
-                bird = self.menuBird2.addAction(item)
-                bird.setCheckable(True)
-                if hasattr(self,'segments') and self.segments[self.box1id].hasLabel(itemorig, cert):
-                    bird.setChecked(True)
-                self.menuBird2.addAction(bird)
+                    bird = self.menuBirdList.addAction(item)
+                    bird.setCheckable(True)
+                    if hasattr(self,'segments') and self.segments[self.box1id].hasLabel(itemorig, cert):
+                        bird.setChecked(True)
+                    self.menuBirdList.addAction(bird)
+                self.menuBirdList.addMenu(self.menuBird2)
+                for item in self.shortBirdList[15:]:
+                    itemorig = item
+                    # Add ? marks if Ctrl menu is called
+                    if unsure and item != "Don't Know" and item != "Other":
+                        cert = 50
+                        item = item+'?'
+                    elif item == "Don't Know":
+                        cert = 0
+                    else:
+                        cert = 100
 
-            self.fullbirdlist = self.makeFullBirdList(unsure=unsure)  # a QComboBox
-            self.showFullbirdlist = QWidgetAction(self.menuBirdList)
-            self.showFullbirdlist.setDefaultWidget(self.fullbirdlist)
-            self.menuBird2.addAction(self.showFullbirdlist)
-            self.fullbirdlist.activated.connect(self.birdSelectedList)
+                    # Transform > marks
+                    pos = item.find('>')
+                    if pos > -1:
+                        item = item[:pos] + ' (' + item[pos+1:] + ')'
+
+                    bird = self.menuBird2.addAction(item)
+                    bird.setCheckable(True)
+                    if hasattr(self,'segments') and self.segments[self.box1id].hasLabel(itemorig, cert):
+                        bird.setChecked(True)
+                    self.menuBird2.addAction(bird)
+
+                self.fullbirdlist = self.makeFullBirdList(unsure=unsure)  # a QComboBox
+                self.showFullbirdlist = QWidgetAction(self.menuBirdList)
+                self.showFullbirdlist.setDefaultWidget(self.fullbirdlist)
+                self.menuBird2.addAction(self.showFullbirdlist)
+                self.fullbirdlist.activated.connect(self.birdSelectedList)
 
     def fillFileList(self,fileName):
         """ Generates the list of files for the file listbox.
@@ -3153,12 +3190,20 @@ class AviaNZ(QMainWindow):
 
         # Put the selected bird name at the top of the list
         if self.config['ReorderList']:
-            # Either move the label to the top of the list, or delete the last
-            if species in self.shortBirdList:
-                self.shortBirdList.remove(species)
+            if self.batmode:
+                # Either move the label to the top of the list, or delete the last
+                if species in self.batList:
+                    self.batList.remove(species)
+                else:
+                    del self.batList[-1]
+                self.batList.insert(0,species)
             else:
-                del self.shortBirdList[-1]
-            self.shortBirdList.insert(0,species)
+                # Either move the label to the top of the list, or delete the last
+                if species in self.shortBirdList:
+                    self.shortBirdList.remove(species)
+                else:
+                    del self.shortBirdList[-1]
+                self.shortBirdList.insert(0,species)
 
         # refresh overview boxes after all updates:
         self.refreshOverviewWith(workingSeg)
@@ -3459,12 +3504,18 @@ class AviaNZ(QMainWindow):
                         labels.append(lab['species'])
 
                 birdspresent = set(labels)
-                for bird in birdspresent:
-                    if bird not in self.shortBirdList:
-                        self.shortBirdList.insert(0,str(bird))
-                        del self.shortBirdList[-1]
+                if self.batmode:
+                    for bird in birdspresent:
+                        if bird not in self.batList:
+                            self.batList.insert(0,str(bird))
+                            del self.batList[-1]
+                else:
+                    for bird in birdspresent:
+                        if bird not in self.shortBirdList:
+                            self.shortBirdList.insert(0,str(bird))
+                            del self.shortBirdList[-1]
 
-            self.humanClassifyDialog1 = Dialogs.HumanClassify1(self.lut,self.colourStart,self.colourEnd,self.config['invertColourMap'], self.config['brightness'], self.config['contrast'], self.shortBirdList, self.longBirdList, self.multipleBirds, self.sp.audioFormat, self)
+            self.humanClassifyDialog1 = Dialogs.HumanClassify1(self.lut,self.colourStart,self.colourEnd,self.config['invertColourMap'], self.config['brightness'], self.config['contrast'], self.shortBirdList, self.longBirdList, self.batList, self.multipleBirds, self.sp.audioFormat, self)
 
             # load the first image:
             self.box1id = -1
@@ -5344,12 +5395,13 @@ class AviaNZ(QMainWindow):
         self.saveSegments()
         fn1 = self.config['BirdListShort']
         if '/' in fn1:
-            ind = fn1[-1::-1].index('/')
-            fn1 = fn1[-ind:]
+            fn1 = os.path.basename(fn1)
         fn2 = self.config['BirdListLong']
         if fn2 is not None and '/' in fn2:
-            ind = fn2[-1::-1].index('/')
-            fn2 = fn2[-ind:]
+            fn2 = os.path.basename(fn2)
+        fn3 = self.config['BatList']
+        if fn3 is not None and '/' in fn3:
+            fn3 = os.path.basename(fn3)
         hasMultipleSegments = False
         for s in self.segments:
             if len(s[4])>1:
@@ -5415,6 +5467,10 @@ class AviaNZ(QMainWindow):
                     #{'name': 'No long list', 'type': 'bool',
                      #'value': self.config['BirdListLong'] is None or self.config['BirdListLong'] == 'None',
                      #'tip': "If you don't have a long list of birds"},
+                    {'name': 'Choose File', 'type': 'action'}
+                ]},
+                {'name': 'Bat List', 'type': 'group', 'children': [
+                    {'name': 'Filename', 'type': 'str', 'value': fn3, 'readonly': True},
                     {'name': 'Choose File', 'type': 'action'}
                 ]},
                 {'name': 'Dynamically reorder bird list', 'type': 'bool', 'value': self.config['ReorderList']},
@@ -5499,6 +5555,8 @@ class AviaNZ(QMainWindow):
                 self.config['BirdListShort'] = data
             elif childName=='Bird List.Full Bird List.Filename':
                 self.config['BirdListLong'] = data
+            elif childName=='Bird List.Bat List.Filename':
+                self.config['BatList'] = data
             elif childName=='Annotation.Segment colours.Confirmed segments':
                 rgbaNamed = list(data.getRgb())
                 if rgbaNamed[3] > 100:
@@ -5558,7 +5616,7 @@ class AviaNZ(QMainWindow):
                 self.reviewer = data
                 self.statusRight.setText("Operator: " + str(self.operator) + ", Reviewer: " + str(self.reviewer))
             elif childName=='Bird List.Common Bird List.Choose File':
-                filename, drop = QFileDialog.getOpenFileName(self, 'Choose File', self.SoundFileDir, "Text files (*.txt)")
+                filename, drop = QFileDialog.getOpenFileName(self, 'Choose Common Bird List', self.SoundFileDir, "Text files (*.txt)")
                 if filename == '':
                     print("no list file selected")
                     return
@@ -5570,7 +5628,7 @@ class AviaNZ(QMainWindow):
                     else:
                         self.shortBirdList = self.ConfigLoader.shortbl(self.config['BirdListShort'], self.configdir)
             elif childName=='Bird List.Full Bird List.Choose File':
-                filename, drop = QFileDialog.getOpenFileName(self, 'Choose File', self.SoundFileDir, "Text files (*.txt)")
+                filename, drop = QFileDialog.getOpenFileName(self, 'Choose Full Bird List', self.SoundFileDir, "Text files (*.txt)")
                 if filename == '':
                     print("no list file selected")
                     return
@@ -5581,6 +5639,18 @@ class AviaNZ(QMainWindow):
                         self.p['Bird List','Full Bird List','Filename'] = filename
                     else:
                         self.longBirdList = self.ConfigLoader.longbl(self.config['BirdListLong'], self.configdir)
+            elif childName=='Bird List.Bat List.Choose File':
+                filename, drop = QFileDialog.getOpenFileName(self, 'Choose Bat List', self.SoundFileDir, "Text files (*.txt)")
+                if filename == '':
+                    print("no list file selected")
+                    return
+                else:
+                    self.batList = self.ConfigLoader.batl(filename, self.configdir)
+                    if self.batList is not None:
+                        self.config['BatList'] = filename
+                        self.p['Bird List','Bat List','Filename'] = filename
+                    else:
+                        self.batList = self.ConfigLoader.batl(self.config['BatList'], self.configdir)
                     #self.p['Bird List','Full Bird List','No long list'] = False
             #elif childName=='Bird List.Full Bird List.No long list':
                 #if param.value():
@@ -5867,7 +5937,7 @@ def mainlauncher(cli, cheatsheet, zooniverse, infile, imagefile, command):
             sys.exit()
 
     # check and if needed copy any other necessary files
-    necessaryFiles = ["ListCommonBirds.txt", "ListDOCBirds.txt"]
+    necessaryFiles = ["ListCommonBirds.txt", "ListDOCBirds.txt", "ListBats.txt"]
     for f in necessaryFiles:
         if not os.path.isfile(os.path.join(configdir, f)):
             print("File %s not found in config dir, providing default" % f)

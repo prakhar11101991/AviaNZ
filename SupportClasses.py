@@ -1011,7 +1011,6 @@ class ConfigLoader(object):
             return None
 
     def longbl(self, file, configdir):
-
         print("Loading long species list from file %s" % file)
         try:
             if os.path.isabs(file):
@@ -1037,6 +1036,35 @@ class ConfigLoader(object):
         except Exception as e:
             print(e)
             msg = MessagePopup("w", "Bad species list", "Warning: Failed to load long species list from " + file + ". Reverting to default.")
+            msg.exec_()
+            return None
+
+    def batl(self, file, configdir):
+        print("Loading bat list from file %s" % file)
+        try:
+            if os.path.isabs(file):
+                # user-picked files will have absolute paths
+                blfile = file
+            else:
+                # initial file will have relative path,
+                # to allow looking it up in various OSes.
+                blfile = os.path.join(configdir, file)
+            if not os.path.isfile(blfile):
+                print("Warning: file %s not found, falling back to default" % blfile)
+                blfile = os.path.join(configdir, "ListBats.txt")
+
+            try:
+                readlist = json.load(open(blfile))
+                return readlist
+            except ValueError as e:
+                print(e)
+                msg = MessagePopup("w", "Bad species list", "Warning: file " + blfile + " corrupt, delete it to restore default. Reverting to default.")
+                msg.exec_()
+                return None
+
+        except Exception as e:
+            print(e)
+            msg = MessagePopup("w", "Bad species list", "Warning: Failed to load bat list from " + file + ". Reverting to default.")
             msg.exec_()
             return None
 

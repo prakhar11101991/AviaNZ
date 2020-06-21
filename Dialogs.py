@@ -1083,7 +1083,7 @@ class HumanClassify1(QDialog):
     # This dialog allows the checking of classifications for segments.
     # It shows a single segment at a time, working through all the segments.
 
-    def __init__(self, lut, colourStart, colourEnd, cmapInverted, brightness, contrast, shortBirdList, longBirdList, multipleBirds, audioFormat, parent=None):
+    def __init__(self, lut, colourStart, colourEnd, cmapInverted, brightness, contrast, shortBirdList, longBirdList, batList, multipleBirds, audioFormat, parent=None):
         QDialog.__init__(self, parent)
         self.setWindowTitle('Check Classifications')
         self.setWindowIcon(QIcon('img/Avianz.ico'))
@@ -1093,6 +1093,7 @@ class HumanClassify1(QDialog):
         self.frame = QWidget()
 
         self.parent = parent
+        self.batmode = self.parent.batmode
         self.lut = lut
         self.label = []
         self.colourStart = colourStart
@@ -1100,6 +1101,7 @@ class HumanClassify1(QDialog):
         self.cmapInverted = cmapInverted
         self.shortBirdList = shortBirdList
         self.longBirdList = longBirdList
+        self.batList = batList
         self.multipleBirds = multipleBirds
         self.saveConfig = False
         self.viewingct = False
@@ -1201,25 +1203,38 @@ class HumanClassify1(QDialog):
         self.birdbtns = []
         if self.multipleBirds:
             self.birds.setExclusive(False)
-            for item in self.shortBirdList[:29]:
-                self.birdbtns.append(QCheckBox(item))
+            if self.batmode:
+                for item in self.batList:
+                    self.birdbtns.append(QCheckBox(item))
+                    self.birds.addButton(self.birdbtns[-1],len(self.birdbtns)-1)
+                    self.birdbtns[-1].clicked.connect(self.tickBirdsClicked)
+            else:
+                for item in self.shortBirdList[:29]:
+                    self.birdbtns.append(QCheckBox(item))
+                    self.birds.addButton(self.birdbtns[-1],len(self.birdbtns)-1)
+                    self.birdbtns[-1].clicked.connect(self.tickBirdsClicked)
+                self.birdbtns.append(QCheckBox('Other')),
                 self.birds.addButton(self.birdbtns[-1],len(self.birdbtns)-1)
                 self.birdbtns[-1].clicked.connect(self.tickBirdsClicked)
-            self.birdbtns.append(QCheckBox('Other')),
-            self.birds.addButton(self.birdbtns[-1],len(self.birdbtns)-1)
-            self.birdbtns[-1].clicked.connect(self.tickBirdsClicked)
-            self.birds3.setSelectionMode(QAbstractItemView.MultiSelection)
+                self.birds3.setSelectionMode(QAbstractItemView.MultiSelection)
         else:
             self.birds.setExclusive(True)
-            for item in self.shortBirdList[:29]:
-                btn = QRadioButton(item)
-                self.birdbtns.append(btn)
-                self.birds.addButton(btn,len(self.birdbtns)-1)
-                btn.clicked.connect(self.radioBirdsClicked)
-            self.birdbtns.append(QRadioButton('Other')),
-            self.birds.addButton(self.birdbtns[-1],len(self.birdbtns)-1)
-            self.birdbtns[-1].clicked.connect(self.radioBirdsClicked)
-            self.birds3.setSelectionMode(QAbstractItemView.SingleSelection)
+            if self.batmode:
+                for item in self.batList:
+                    btn = QRadioButton(item)
+                    self.birdbtns.append(btn)
+                    self.birds.addButton(btn,len(self.birdbtns)-1)
+                    btn.clicked.connect(self.radioBirdsClicked)
+            else:
+                for item in self.shortBirdList[:29]:
+                    btn = QRadioButton(item)
+                    self.birdbtns.append(btn)
+                    self.birds.addButton(btn,len(self.birdbtns)-1)
+                    btn.clicked.connect(self.radioBirdsClicked)
+                self.birdbtns.append(QRadioButton('Other')),
+                self.birds.addButton(self.birdbtns[-1],len(self.birdbtns)-1)
+                self.birdbtns[-1].clicked.connect(self.radioBirdsClicked)
+                self.birds3.setSelectionMode(QAbstractItemView.SingleSelection)
 
         self.birds3.setEnabled(False)
 
@@ -1277,21 +1292,28 @@ class HumanClassify1(QDialog):
             btn.hide()
             birds2Layout.addWidget(btn)
 
-        birdListLayout = QGridLayout()
-        birdListLayout.setRowStretch(0, 10)
-        birdListLayout.setRowStretch(1, 0)
-        birdListLayout.setRowStretch(2, 0)
-        birdListLayout.addWidget(self.birds3, 0, 0, 1, 3)
-        birdListLayout.addWidget(self.tboxLabel1, 1, 0, 1, 3)
-        birdListLayout.addWidget(self.tboxLabel2, 2, 0, 1, 3)
-        birdListLayout.addWidget(self.tbox, 3, 0, 1, 2)
-        birdListLayout.addWidget(self.viewSpButton, 3, 2, 1, 1)
-
         hboxBirds = QHBoxLayout()
         hboxBirds.addLayout(birds1Layout)
         hboxBirds.addLayout(birds2Layout)
         hboxBirds.addLayout(birds3Layout)
-        hboxBirds.addLayout(birdListLayout)
+        # this hides the long list and "Add" options in batmode
+        if self.batmode:
+            self.birds3.hide()
+            self.tboxLabel1.hide()
+            self.tboxLabel2.hide()
+            self.tbox.hide()
+            self.viewSpButton.hide()
+        else:
+            birdListLayout = QGridLayout()
+            birdListLayout.setRowStretch(0, 10)
+            birdListLayout.setRowStretch(1, 0)
+            birdListLayout.setRowStretch(2, 0)
+            birdListLayout.addWidget(self.birds3, 0, 0, 1, 3)
+            birdListLayout.addWidget(self.tboxLabel1, 1, 0, 1, 3)
+            birdListLayout.addWidget(self.tboxLabel2, 2, 0, 1, 3)
+            birdListLayout.addWidget(self.tbox, 3, 0, 1, 2)
+            birdListLayout.addWidget(self.viewSpButton, 3, 2, 1, 1)
+            hboxBirds.addLayout(birdListLayout)
 
         # The layouts
         hboxNextPrev = QHBoxLayout()
@@ -1446,9 +1468,14 @@ class HumanClassify1(QDialog):
     def updateButtonList(self):
         # refreshes bird button names
         # to be used when bird list updates
-        for i in range(len(self.birdbtns)-1):
-            self.birdbtns[i].setChecked(False)
-            self.birdbtns[i].setText(self.shortBirdList[i])
+        if self.batmode:
+            for i in range(len(self.birdbtns)-1):
+                self.birdbtns[i].setChecked(False)
+                self.birdbtns[i].setText(self.batList[i])
+        else:
+            for i in range(len(self.birdbtns)-1):
+                self.birdbtns[i].setChecked(False)
+                self.birdbtns[i].setText(self.shortBirdList[i])
         # "other" button
         self.birdbtns[-1].setChecked(False)
         self.birds3.setEnabled(False)
@@ -1573,11 +1600,18 @@ class HumanClassify1(QDialog):
                 specnames[lsp_ix] = specnames[lsp_ix][:-1]
             # move the label to the top of the list
             if self.parent.config['ReorderList']:
-                if specnames[lsp_ix] in self.shortBirdList:
-                    self.shortBirdList.remove(specnames[lsp_ix])
+                if self.batmode:
+                    if specnames[lsp_ix] in self.batList:
+                        self.batList.remove(specnames[lsp_ix])
+                    else:
+                        del self.batList[-1]
+                    self.batList.insert(0, specnames[lsp_ix])
                 else:
-                    del self.shortBirdList[-1]
-                self.shortBirdList.insert(0, specnames[lsp_ix])
+                    if specnames[lsp_ix] in self.shortBirdList:
+                        self.shortBirdList.remove(specnames[lsp_ix])
+                    else:
+                        del self.shortBirdList[-1]
+                    self.shortBirdList.insert(0, specnames[lsp_ix])
 
         # clear selection
         self.birds3.clearSelection()
@@ -1585,31 +1619,35 @@ class HumanClassify1(QDialog):
         # Select the right species tickboxes / buttons
         for lsp in specnames:
             # add ticks to the right checkboxes
-            if lsp in self.shortBirdList[:29]:
-                ind = self.shortBirdList.index(lsp)
+            if self.batmode:
+                ind = self.batList.index(lsp)
                 self.birdbtns[ind].setChecked(True)
             else:
-                self.birdbtns[29].setChecked(True)
-                self.birds3.setEnabled(True)
+                if lsp in self.shortBirdList[:29]:
+                    ind = self.shortBirdList.index(lsp)
+                    self.birdbtns[ind].setChecked(True)
+                else:
+                    self.birdbtns[29].setChecked(True)
+                    self.birds3.setEnabled(True)
 
-            # mark this species in the long list box
-            if lsp not in self.longBirdList:
-                # try genus>species instead of genus (species)
-                if '(' in lsp:
-                    ind = lsp.index('(')
-                    lsp = lsp[:ind-1] + ">" + lsp[ind+1:-1]
-                # add to long bird list then
+                # mark this species in the long list box
                 if lsp not in self.longBirdList:
-                    print("Species", lsp, "not found in long bird list, adding")
-                    self.longBirdList.append(lsp)
-                    cc = self.birds3.count()
-                    self.birds3.insertItem(cc-1, lsp)
-                    self.saveConfig = True
+                    # try genus>species instead of genus (species)
+                    if '(' in lsp:
+                        ind = lsp.index('(')
+                        lsp = lsp[:ind-1] + ">" + lsp[ind+1:-1]
+                    # add to long bird list then
+                    if lsp not in self.longBirdList:
+                        print("Species", lsp, "not found in long bird list, adding")
+                        self.longBirdList.append(lsp)
+                        cc = self.birds3.count()
+                        self.birds3.insertItem(cc-1, lsp)
+                        self.saveConfig = True
 
-            # all species by now are in the long bird list
-            if self.longBirdList is not None:
-                ind = self.longBirdList.index(lsp)
-                self.birds3.item(ind).setSelected(True)
+                # all species by now are in the long bird list
+                if self.longBirdList is not None:
+                    ind = self.longBirdList.index(lsp)
+                    self.birds3.item(ind).setSelected(True)
 
         self.label = specnames
 
@@ -1685,11 +1723,12 @@ class HumanClassify1(QDialog):
             self.ctLabel.hide()
             for spbtn in self.birdbtns:
                 spbtn.show()
-            self.birds3.show()
-            self.tbox.show()
-            self.tboxLabel1.show()
-            self.tboxLabel2.show()
-            self.viewSpButton.setIcon(QIcon('img/splarge-ct.png'))
+            if not self.batmode:
+                self.birds3.show()
+                self.tbox.show()
+                self.tboxLabel1.show()
+                self.tboxLabel2.show()
+                self.viewSpButton.setIcon(QIcon('img/splarge-ct.png'))
 
         self.viewingct = showCt
 
