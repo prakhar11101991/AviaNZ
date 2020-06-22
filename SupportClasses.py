@@ -182,7 +182,7 @@ class TimeAxisWidget(QAbstractButton):
             # draw tickmarks and numbers
             currTime = 0
             fontOffset = 5+1.5*self.fontsize
-            if self.maxTime>4:
+            if self.maxTime>=10:
                 timeFormat = "%d"
             else:
                 timeFormat = "%.1f"
@@ -199,7 +199,7 @@ class TimeAxisWidget(QAbstractButton):
                 painter.drawText(tickmark.x1()-fontOffset//4, tickmark.y1()+fontOffset, timeFormat % currTime)
             tickmark.translate(event.rect().width()//5-2,0)
             painter.drawLine(tickmark)
-            painter.drawText(tickmark.x2()-fontOffset*0.6, tickmark.y1()+fontOffset, timeFormat % self.maxTime)
+            painter.drawText(tickmark.x2()-fontOffset*0.7, tickmark.y1()+fontOffset, timeFormat % self.maxTime)
 
             painter.save()
             painter.drawText((bottomR.x() - bottomL.x())//2, bottomL.y(), "s")

@@ -2283,7 +2283,11 @@ class HumanClassify2(QDialog):
             maxFreq = exampleSP.sampleRate // 2
         #SgSize = np.shape(exampleSP.sg)[1]  # in spec units
         SgSize = self.specV
-        duration = len(exampleSP.data)/exampleSP.sampleRate
+        if len(exampleSP.data)>0:
+            duration = len(exampleSP.data)/exampleSP.sampleRate
+        else:
+            duration = exampleSP.convertSpectoAmpl(np.shape(exampleSP.sg)[0])
+        print("Found duration", duration, "px", self.specH)
 
         butNum = 0
         for row in range(self.numPicsV):

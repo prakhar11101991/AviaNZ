@@ -1259,7 +1259,7 @@ class AviaNZ_reviewAll(QMainWindow):
         for root, dirs, files in os.walk(str(self.dirName)):
             for filename in files:
                 filenamef = os.path.join(root, filename)
-                if filename.lower().endswith('.wav') and os.path.isfile(filenamef + '.data'):
+                if (filename.lower().endswith('.wav') or filename.lower().endswith('.bmp')) and os.path.isfile(filenamef + '.data'):
                     allwavs.append(filenamef)
         total = len(allwavs)
         print(total, "files found")
@@ -1290,11 +1290,23 @@ class AviaNZ_reviewAll(QMainWindow):
                 continue
 
             # check if file is formatted correctly
-            with open(filename, 'br') as f:
-                if f.read(4) != b'RIFF':
-                    print("Warning: file %s not formatted correctly, skipping" % filename)
-                    continue
+            if filename.lower().endswith('.wav'):
+                with open(filename, 'br') as f:
+                    if f.read(4) != b'RIFF':
+                        print("Warning: WAV file %s not formatted correctly, skipping" % filename)
+                        continue
+                self.batmode = False
+            elif filename.lower().endswith('.bmp'):
+                with open(filename, 'br') as f:
+                    if f.read(2) != b'BM':
+                        print("Warning: BMP file %s not formatted correctly" % filename)
+                        continue
+                self.batmode = True
+            else:
+                print("Warning: file %s format not recognised " % filename)
+                continue
 
+            # detect timestamp
             DOCRecording = re.search('(\d{6})_(\d{6})', os.path.basename(filename))
             if DOCRecording:
                 startTime = DOCRecording.group(2)
@@ -1484,11 +1496,20 @@ class AviaNZ_reviewAll(QMainWindow):
 
         self.loadFile(filename, self.species, chunksize)
 
+        if self.batmode:
+            guide1freq = 5000
+            guide2freq = 7000
+        else:
+            guide1freq = None
+            guide2freq = None
+
         # Initialize the dialog for this file
         self.humanClassifyDialog2 = Dialogs.HumanClassify2(self.sps, self.segments, self.indices2show,
                                                            self.species, self.lut, self.colourStart,
                                                            self.colourEnd, self.config['invertColourMap'],
-                                                           self.config['brightness'], self.config['contrast'], filename=self.filename)
+                                                           self.config['brightness'], self.config['contrast'],
+                                                           guide1freq=guide1freq, guide2freq=guide2freq,
+                                                           filename=self.filename)
         if hasattr(self, 'dialogPos'):
             self.humanClassifyDialog2.resize(self.dialogSize)
             self.humanClassifyDialog2.move(self.dialogPos)
@@ -1651,9 +1672,11 @@ class AviaNZ_reviewAll(QMainWindow):
             else:
                 self.longBirdList = None
 
+        self.batList = self.ConfigLoader.batl(self.config['BatList'], self.configdir)
+
         self.loadFile(filename)
         # HumanClassify1 reads audioFormat from parent.sp.audioFormat, so need this:
-        self.humanClassifyDialog1 = Dialogs.HumanClassify1(self.lut,self.colourStart,self.colourEnd,self.config['invertColourMap'], self.config['brightness'], self.config['contrast'], self.shortBirdList, self.longBirdList, self.config['MultipleSpecies'], self.sps[0].audioFormat, self)
+        self.humanClassifyDialog1 = Dialogs.HumanClassify1(self.lut,self.colourStart,self.colourEnd,self.config['invertColourMap'], self.config['brightness'], self.config['contrast'], self.shortBirdList, self.longBirdList, self.batList, self.config['MultipleSpecies'], self.sps[0].audioFormat, self)
         self.box1id = -1
         # if there was a previous dialog, try to recreate its settings
         if hasattr(self, 'dialogPos'):
@@ -1700,8 +1723,15 @@ class AviaNZ_reviewAll(QMainWindow):
                 dlg.repaint()
                 dlg.show()
 
-                # Determine the sample rate and set some file-level parameters
-                samplerate, duration, _, _ = wavio.readFmt(filename)
+                if self.batmode:
+                    # Not sure how to do an equivalent of readFmt for bmps?
+                    # Maybe easier to just read in the entire bmp here?
+                    samplerate = 16000
+                    duration = self.segments.metadata["Duration"]
+                else:
+                    # Determine the sample rate and set some file-level parameters
+                    samplerate, duration, _, _ = wavio.readFmt(filename)
+
                 minFreq = max(self.fLow.value(), 0)
                 maxFreq = min(self.fHigh.value(), samplerate//2)
                 if maxFreq - minFreq < 100:
@@ -1741,24 +1771,32 @@ class AviaNZ_reviewAll(QMainWindow):
                             x1 = max(x1nob - self.config['reviewSpecBuffer'], 0)
                             x2 = min(x2nob + self.config['reviewSpecBuffer'], duration)
 
-                        # Load. segix>1 to print the format details only once for each file
-                        sp.readWav(filename, off=x1, len=x2-x1, silent=segix>1)
+                        # Actual loading of the wav/bmp/spectrogram
+                        if self.batmode:
+                            sp.readBmp(filename, off=x1, len=x2-x1, silent=segix>1)
+                            # sgRaw was already normalized to 0-1 when loading
+                            # with 1 being loudest
+                            sgRaw = sp.sg
+                            sp.sg = np.abs(np.where(sgRaw == 0, -30, 10*np.log10(sgRaw)))
+                        else:
+                            # segix>1 to print the format details only once for each file
+                            sp.readWav(filename, off=x1, len=x2-x1, silent=segix>1)
 
-                        # Filter the audiodata based on initial sliders
-                        sp.data = sp.ButterworthBandpass(sp.data, sp.sampleRate, minFreq, maxFreq)
+                            # Filter the audiodata based on initial sliders
+                            sp.data = sp.ButterworthBandpass(sp.data, sp.sampleRate, minFreq, maxFreq)
+
+                            # Generate the spectrogram
+                            _ = sp.spectrogram(window='Hann', mean_normalise=True, onesided=True,multitaper=False, need_even=False)
+
+                            # collect min and max values for final colour scale
+                            minsg = min(np.min(sp.sg), minsg)
+                            maxsg = max(np.max(sp.sg), maxsg)
+                            sp.sg = np.abs(np.where(sp.sg==0, 0.0, 10.0 * np.log10(sp.sg/minsg)))
 
                         # need to also store unbuffered limits in spec units
                         # (relative to start of segment)
                         sp.x1nobspec = sp.convertAmpltoSpec(x1nob-x1)
                         sp.x2nobspec = sp.convertAmpltoSpec(x2nob-x1)
-
-                        # Generate the spectrogram
-                        _ = sp.spectrogram(window='Hann', mean_normalise=True, onesided=True,multitaper=False, need_even=False)
-
-                        # collect min and max values for final colour scale
-                        minsg = min(np.min(sp.sg), minsg)
-                        maxsg = max(np.max(sp.sg), maxsg)
-                        sp.sg = np.abs(np.where(sp.sg==0, 0.0, 10.0 * np.log10(sp.sg/minsg)))
 
                         # trim the spectrogram
                         height = sp.sampleRate//2 / np.shape(sp.sg)[1]
@@ -1804,13 +1842,20 @@ class AviaNZ_reviewAll(QMainWindow):
             minFreq = max(self.fLow.value(), 0)
             maxFreq = min(self.fHigh.value(), sp.sampleRate//2)
 
+            if self.batmode:
+                guide1y = sp.convertFreqtoY(5000)
+                guide2y = sp.convertFreqtoY(7000)
+            else:
+                guide1y = None
+                guide2y = None
+
             # currLabel, then unbufstart in spec units rel to start, unbufend,
             # then true time to display start, end,
             # NOTE: might be good to pass copy.deepcopy(seg[4])
             # instead of seg[4], if any bugs come up due to Dialog1 changing the label
             self.humanClassifyDialog1.setImage(sp.sg, sp.data, sp.sampleRate, sp.incr,
                                                seg[4], sp.x1nobspec, sp.x2nobspec,
-                                               seg[0], seg[1], minFreq, maxFreq)
+                                               seg[0], seg[1], guide1y, guide2y, minFreq, maxFreq)
         else:
             # store dialog properties such as position for the next file
             self.dialogSize = self.humanClassifyDialog1.size()

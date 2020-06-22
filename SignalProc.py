@@ -110,6 +110,11 @@ class SignalProc:
             print("ERROR: image was not loaded")
             return
 
+        self.data = []
+        self.fileLength = (h-2)*self.incr + self.window_width  # in samples
+        # Alternatively:
+        # self.fileLength = self.convertSpectoAmpl(h-1)*self.sampleRate
+
         # Check color format and convert to grayscale
         print("img format", img.format())
         if not silent and (not img.allGray() or colc>256):
@@ -149,9 +154,6 @@ class SignalProc:
 
         self.sg = img2
 
-        self.data = []
-        self.fileLength = (h-2)*self.incr + self.window_width  # (in samples)
-
         self.audioFormat.setChannelCount(0)
         self.audioFormat.setSampleSize(0)
         self.audioFormat.setSampleRate(self.sampleRate)
@@ -185,6 +187,10 @@ class SignalProc:
     def convertAmpltoSpec(self, x):
         """ Unit conversion, for easier use wherever spectrograms are needed """
         return x*self.sampleRate/self.incr
+
+    def convertSpectoAmpl(self,x):
+        """ Unit conversion """
+        return x*self.incr/self.sampleRate
 
     def convertFreqtoY(self,f):
         """ Unit conversion """
