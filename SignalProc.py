@@ -92,15 +92,15 @@ class SignalProc:
         if not silent:
             print("Detected format: %d channels, %d Hz, %d bit samples" % (self.audioFormat.channelCount(), self.audioFormat.sampleRate(), self.audioFormat.sampleSize()))
 
-    def readBmp(self, file, len=None, off=0, silent=False):
+    def readBmp(self, file, len=None, off=0, silent=False, rotate=True):
         """ Reads DOC-standard bat recordings in 8x row-compressed BMP format.
             For similarity with readWav, accepts len and off args, in seconds.
+            rotate: if True, rotates to match setImage and other spectrograms (rows=time)
+                otherwise preserves normal orientation (cols=time)
         """
-        # Important:
-        # CHANGE INCR HERE IF DEFAULT ONE ON SELF IS NOT CORRECT
-        # self.incr = incr
-        # TODO get this sorted
-        self.sampleRate = 16000
+        # !! Important to set these, as they are used in other functions
+        self.sampleRate = 176000
+        self.incr = 512
 
         img = QImage(file, "BMP")
         h = img.height()
@@ -110,13 +110,7 @@ class SignalProc:
             print("ERROR: image was not loaded")
             return
 
-        self.data = []
-        self.fileLength = (h-2)*self.incr + self.window_width  # in samples
-        # Alternatively:
-        # self.fileLength = self.convertSpectoAmpl(h-1)*self.sampleRate
-
         # Check color format and convert to grayscale
-        print("img format", img.format())
         if not silent and (not img.allGray() or colc>256):
             print("Warning: image provided not in 8-bit grayscale, information will be lost")
         img.convertTo(QImage.Format_Grayscale8)
@@ -127,14 +121,29 @@ class SignalProc:
         ptr.setsize(h*w*1)
         img2 = np.array(ptr).reshape(h, w)
 
-        # TODO commented out for now - maybe this is useful for establishing contrast?
-        # img2[:, -1] = 254   # cut last row
-        img2 = np.repeat(img2, 8, axis=1)  # repeat rows 7 times to fit invertspectrogram
-        img2 = np.rot90(img2, 2)  # rotate 180*
-        img2 = img2[1:, : ]  # Cutting first column because it only contains the scale
+        # Determine if original image was rotated, based on expected num of freq bins and freq 0 being empty
+        if h==64 and np.all(img2[-1, :]==0):
+            # standard DoC format
+            pass
+        elif w==64 and np.all(img2[:, -1]==0):
+            # seems like DoC format, rotated at -90*
+            img2 = np.rot90(img2, 1, (1,0))
+            w, h = h, w
+        else:
+            print("ERROR: image does not appear to be in DoC format!")
+            return
 
-        img2 = 254.0 * np.ones(np.shape(img2)) - img2  # reverse value having the black as the most intense
+        # Could skip that for visuaal mode - maybe useful for establishing contrast?
+        img2[-1, :] = 254  # lowest freq bin is 0, flip that
+        img2 = 254.0 - img2  # reverse value having the black as the most intense
         img2 = img2/np.max(img2)  # normalization
+        img2 = img2[:, 1:]  # Cutting first time bin because it only contains the scale and cutting last columns
+        img2 = np.repeat(img2, 8, axis=0)  # repeat freq bins 7 times to fit invertspectrogram
+
+        self.data = []
+        self.fileLength = (w-2)*self.incr + self.window_width  # in samples
+        # Alternatively:
+        # self.fileLength = self.convertSpectoAmpl(h-1)*self.sampleRate
 
         # NOTE: conversions will use self.sampleRate and self.incr, so ensure those are already set!
         # trim to specified offset and length:
@@ -142,11 +151,17 @@ class SignalProc:
             # Convert offset from seconds to pixels
             off = int(self.convertAmpltoSpec(off))
             if len is None:
-                img2 = img2[off:, :]
+                img2 = img2[:, off:]
             else:
                 # Convert length from seconds to pixels:
                 len = int(self.convertAmpltoSpec(len))
-                img2 = img2[off:(off+len),:]
+                img2 = img2[:, off:(off+len)]
+
+        if rotate:
+            # rotate for display, b/c required spectrogram dimensions are:
+            #  t increasing over rows, f increasing over cols
+            # This will be enough if the original image was spectrogram-shape.
+            img2 = np.rot90(img2, 1, (1,0))
 
         if not silent:
             print(np.shape(img2))
