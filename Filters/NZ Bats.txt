@@ -1,0 +1,18 @@
+{"species": "NZ Bats",
+
+"SampleRate": 176000,
+
+"Filters": [{"calltype": "Bat", 
+        "TimeRange": [0.0, 900.0, 0.0, 0.0],
+        "FreqRange": [0, 88000],
+        "WaveletParams": {"thr": 0.0, "M": 0.0, "nodes": []},
+        "Feature": ""
+        }],
+"CNN": {"CNN_name": "Kiwi (Nth Is Brown)",
+        "loss": "binary_crossentropy",
+        "optimizer": "adam",
+        "win": [1.0, 0.1],
+        "inputdim": [128, 123],
+        "output": {"0": "Male", "1": "Female", "2": "Noise", "3":"Silence"},
+        "windowInc":[256, 128],
+        "thr":[[0.46, 0.64, 0.86, 0.95], [0.37, 0.55, 0.73, 0.91], [0.4, 0.6, 0.81], [0.53, 0.71, 0.93]]}}

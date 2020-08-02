@@ -869,8 +869,8 @@ class AviaNZ(QMainWindow):
         self.bar.btn = self.MouseDrawingButton
 
         # guides that can be used in batmode
-        self.guide1 = pg.InfiniteLine(angle=0, movable=False, pen={'color': 'y', 'width': 2})
-        self.guide2 = pg.InfiniteLine(angle=0, movable=False, pen={'color': 'y', 'width': 2})
+        self.guide1 = pg.InfiniteLine(angle=0, movable=False, pen={'color': (255,191,89), 'width': 2})
+        self.guide2 = pg.InfiniteLine(angle=0, movable=False, pen={'color': (255,191,89), 'width': 2})
 
         # A slider to move through the file easily
         self.scrollSlider = QScrollBar(Qt.Horizontal)
@@ -1519,7 +1519,7 @@ class AviaNZ(QMainWindow):
             dlg.update()
 
             self.datalengthSec = self.datalength / self.sampleRate
-            print("Length of file is ", self.datalengthSec, " seconds (", self.datalength, "samples) loaded from ", self.sp.fileLength / self.sampleRate, "seconds (", self.sp.fileLength, " samples) with sample rate ",self.sampleRate, " Hz.")
+            print("Length of file is ", self.datalengthSec, " seconds (", self.datalength, " samples) loaded from ", self.sp.fileLength / self.sampleRate, "seconds (", self.sp.fileLength, " samples) with sample rate ",self.sampleRate, " Hz.")
 
             if name is not None:  # i.e. starting a new file, not next section
                 if self.datalength != self.sp.fileLength:
@@ -2029,8 +2029,8 @@ class AviaNZ(QMainWindow):
 
         # Frequency guides for bat mode
         if self.batmode:
-            self.guide1.setValue(self.convertFreqtoY(5000))
-            self.guide2.setValue(self.convertFreqtoY(7000))
+            self.guide1.setValue(self.convertFreqtoY(24000))
+            self.guide2.setValue(self.convertFreqtoY(54000))
             self.p_spec.addItem(self.guide1, ignoreBounds=True)
             self.p_spec.addItem(self.guide2, ignoreBounds=True)
         else:
@@ -4289,24 +4289,27 @@ class AviaNZ(QMainWindow):
             return
         with pg.BusyCursor():
             self.statusLeft.setText("Updating the spectrogram...")
-            self.sp.setWidth(int(str(window_width)), int(str(incr)))
-            sgRaw = self.sp.spectrogram(window=str(windowType),mean_normalise=self.sgMeanNormalise,equal_loudness=self.sgEqualLoudness,onesided=self.sgOneSided,multitaper=self.sgMultitaper)
-            maxsg = np.min(sgRaw)
-            self.sg = np.abs(np.where(sgRaw==0,0.0,10.0 * np.log10(sgRaw/maxsg)))
+            if self.batmode:
+                print("Warning: only spectrogram freq. range can be changed in BMP mode")
+            else:
+                self.sp.setWidth(int(str(window_width)), int(str(incr)))
+                sgRaw = self.sp.spectrogram(window=str(windowType),mean_normalise=self.sgMeanNormalise,equal_loudness=self.sgEqualLoudness,onesided=self.sgOneSided,multitaper=self.sgMultitaper)
+                maxsg = np.min(sgRaw)
+                self.sg = np.abs(np.where(sgRaw==0,0.0,10.0 * np.log10(sgRaw/maxsg)))
 
-            # If the size of the spectrogram has changed, need to update the positions of things
-            if int(str(incr)) != self.config['incr'] or int(str(window_width)) != self.config['window_width']:
-                self.config['incr'] = int(str(incr))
-                self.config['window_width'] = int(str(window_width))
-                if hasattr(self, 'seg'):
-                    self.seg.setNewData(self.sp)
+                # If the size of the spectrogram has changed, need to update the positions of things
+                if int(str(incr)) != self.config['incr'] or int(str(window_width)) != self.config['window_width']:
+                    self.config['incr'] = int(str(incr))
+                    self.config['window_width'] = int(str(window_width))
+                    if hasattr(self, 'seg'):
+                        self.seg.setNewData(self.sp)
 
-                self.loadFile(self.filename)
-                # self.specPlot.setImage(self.sg)   # TODO: interface changes to adapt if window_len and incr changed! overview, main spec ect.
+                    self.loadFile(self.filename)
+                    # self.specPlot.setImage(self.sg)   # TODO: interface changes to adapt if window_len and incr changed! overview, main spec ect.
 
-                # these two are usually set by redoFreqAxis, but that is called only later in this case
-                self.spectrogramDialog.low.setValue(minFreq)
-                self.spectrogramDialog.high.setValue(maxFreq)
+                    # these two are usually set by redoFreqAxis, but that is called only later in this case
+                    self.spectrogramDialog.low.setValue(minFreq)
+                    self.spectrogramDialog.high.setValue(maxFreq)
 
             self.redoFreqAxis(minFreq,maxFreq)
 

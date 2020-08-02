@@ -1135,8 +1135,8 @@ class HumanClassify1(QDialog):
         self.pPlot.addItem(self.line2)
 
         # prepare guides for marking true segment boundaries
-        self.guide1 = pg.InfiniteLine(angle=0, pen={'color': 'y', 'width': 2})
-        self.guide2 = pg.InfiniteLine(angle=0, pen={'color': 'y', 'width': 2})
+        self.guide1 = pg.InfiniteLine(angle=0, pen={'color': (255,191,89), 'width': 2})
+        self.guide2 = pg.InfiniteLine(angle=0, pen={'color': (255,191,89), 'width': 2})
         self.pPlot.addItem(self.guide1)
         self.pPlot.addItem(self.guide2)
 
