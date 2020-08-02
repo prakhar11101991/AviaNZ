@@ -48,6 +48,7 @@ import re
 import sys
 import io
 from tensorflow.keras.models import model_from_json
+from tensorflow.keras.models import load_model
 
 class TimeAxisHour(pg.AxisItem):
     # Time axis (at bottom of spectrogram)
@@ -958,19 +959,27 @@ class ConfigLoader(object):
             if "CNN" not in filt:
                 continue
             elif filt["CNN"]:
-                try:
-                    json_file = open(os.path.join(dircnn, filt["CNN"]["CNN_name"]) + '.json', 'r')
-                    loaded_model_json = json_file.read()
-                    json_file.close()
-                    model = model_from_json(loaded_model_json)
-                    model.load_weights(os.path.join(dircnn, filt["CNN"]["CNN_name"]) + '.h5')
-                    print('Loaded model:', os.path.join(dircnn, filt["CNN"]["CNN_name"]))
-                    print('Loaded model:', os.path.join(dircnn, filt["CNN"]["CNN_name"]))
-                    model.compile(loss=filt["CNN"]["loss"], optimizer=filt["CNN"]["optimizer"], metrics=['accuracy'])
-                    targetmodels[species] = [model, filt["CNN"]["win"], filt["CNN"]["inputdim"], filt["CNN"]["output"],
-                                             filt["CNN"]["windowInc"], filt["CNN"]["thr"]]
-                except Exception as e:
-                    print("Could not load CNN model from file:", os.path.join(dircnn, filt["CNN"]["CNN_name"]), e)
+                if species == "NZ Bats":
+                    try:
+                        model = load_model(os.path.join(dircnn, filt["CNN"]["CNN_name"]))
+                        targetmodels[species] = [model, filt["CNN"]["win"], filt["CNN"]["inputdim"], filt["CNN"]["output"],
+                                                 filt["CNN"]["windowInc"], filt["CNN"]["thr"]]
+                    except Exception as e:
+                        print("Could not load CNN model from file:", os.path.join(dircnn, filt["CNN"]["CNN_name"]), e)
+                else:
+                    try:
+                        json_file = open(os.path.join(dircnn, filt["CNN"]["CNN_name"]) + '.json', 'r')
+                        loaded_model_json = json_file.read()
+                        json_file.close()
+                        model = model_from_json(loaded_model_json)
+                        model.load_weights(os.path.join(dircnn, filt["CNN"]["CNN_name"]) + '.h5')
+                        print('Loaded model:', os.path.join(dircnn, filt["CNN"]["CNN_name"]))
+                        print('Loaded model:', os.path.join(dircnn, filt["CNN"]["CNN_name"]))
+                        model.compile(loss=filt["CNN"]["loss"], optimizer=filt["CNN"]["optimizer"], metrics=['accuracy'])
+                        targetmodels[species] = [model, filt["CNN"]["win"], filt["CNN"]["inputdim"], filt["CNN"]["output"],
+                                                 filt["CNN"]["windowInc"], filt["CNN"]["thr"]]
+                    except Exception as e:
+                        print("Could not load CNN model from file:", os.path.join(dircnn, filt["CNN"]["CNN_name"]), e)
         print("Loaded CNN models:", list(targetmodels.keys()))
         return targetmodels
 
