@@ -445,9 +445,6 @@ class AviaNZ_batchProcess(QMainWindow):
             self.method = "Intermittent sampling"
             speciesStr = "Intermittent sampling"
             filters = None
-        elif "NZ Bats" in self.species:
-            self.method = "Bats"
-            self.CNNDicts = self.ConfigLoader.CNNmodels(self.FilterDicts, self.filtersDir, self.species)
         else:
             if "NZ Bats" in self.species:
                 self.method = "Click"
