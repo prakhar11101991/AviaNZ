@@ -445,12 +445,13 @@ class AviaNZ_batchProcess(QMainWindow):
             self.method = "Intermittent sampling"
             speciesStr = "Intermittent sampling"
             filters = None
-        elif "NZ Bats" in self.species:
-            self.method = "Bats"
-            self.CNNDicts = self.ConfigLoader.CNNmodels(self.FilterDicts, self.filtersDir, self.species)
+        #elif "NZ Bats" in self.species:
+            #self.method = "Click"
+            #speciesStr = "Bats"
         else:
             if "NZ Bats" in self.species:
                 self.method = "Click"
+                self.CNNDicts = self.ConfigLoader.CNNmodels(self.FilterDicts, self.filtersDir, self.species)
             else:
                 self.method = "Wavelets"
 
@@ -1240,22 +1241,22 @@ class AviaNZ_batchProcess(QMainWindow):
             reallyHasLT = LT_mean>=thr1 and LT_best3mean>=thr2
 
             if reallyHasLT and hasSTlow:
-                label.append({"species": "Long-tailed bat", "cert": 50})
+                label.append({"species": "Long-tailed bat", "certainty": 50})
             elif reallyHasLT:
-                label.append({"species": "Long-tailed bat", "cert": 100})
+                label.append({"species": "Long-tailed bat", "certainty": 100})
             elif hasLT and ST_mean<thr1:
-                label.append({"species": "Long-tailed bat", "cert": 50})
+                label.append({"species": "Long-tailed bat", "certainty": 50})
 
             if reallyHasST and hasLTlow:
-                label.append({"species": "Short-tailed bat", "cert": 50})
+                label.append({"species": "Short-tailed bat", "certainty": 50})
             elif reallyHasST:
-                label.append({"species": "Short-tailed bat", "cert": 100})
+                label.append({"species": "Short-tailed bat", "certainty": 100})
             elif hasST and LT_mean<thr1:
-                label.append({"species": "Short-tailed bat", "cert": 50})
+                label.append({"species": "Short-tailed bat", "certainty": 50})
 
             if LT_mean>=thr1 and ST_mean>=thr1 and not (reallyHasST and reallyHasLT):
-                label.append({"species": "Long-tailed bat", "cert": 50})
-                label.append({"species": "Short-tailed bat", "cert": 50})
+                label.append({"species": "Long-tailed bat", "certainty": 50})
+                label.append({"species": "Short-tailed bat", "certainty": 50})
 
         return label
 
