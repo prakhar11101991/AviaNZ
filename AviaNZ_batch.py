@@ -1352,7 +1352,7 @@ class AviaNZ_reviewAll(QMainWindow):
         self.fHigh = QSlider(Qt.Horizontal)
         self.fHigh.setTickPosition(QSlider.TicksBelow)
         self.fHigh.setTickInterval(1000)
-        self.fHigh.setRange(4000, 32000)
+        self.fHigh.setRange(4000, 88000)
         self.fHigh.setSingleStep(250)
         self.fHigh.setValue(8000)
         self.fHightext = QLabel('Show freq. below (Hz)')
@@ -1723,7 +1723,6 @@ class AviaNZ_reviewAll(QMainWindow):
         alldatas = []
         for root, dirs, files in os.walk(str(self.dirName)):
             for filename in files:
-                print(filename)
                 if filename.endswith('.data'):
                     print("Appending" ,filename)
                     filenamef = os.path.join(root, filename)
@@ -1785,8 +1784,8 @@ class AviaNZ_reviewAll(QMainWindow):
         self.loadFile(filename, self.species, chunksize)
 
         if self.batmode:
-            guide1freq = 5000
-            guide2freq = 7000
+            guide1freq = 24000
+            guide2freq = 54000
         else:
             guide1freq = None
             guide2freq = None
@@ -2014,7 +2013,7 @@ class AviaNZ_reviewAll(QMainWindow):
                 if self.batmode:
                     # Not sure how to do an equivalent of readFmt for bmps?
                     # Maybe easier to just read in the entire bmp here?
-                    samplerate = 16000
+                    samplerate = 176000
                     duration = self.segments.metadata["Duration"]
                 else:
                     # Determine the sample rate and set some file-level parameters
@@ -2131,8 +2130,8 @@ class AviaNZ_reviewAll(QMainWindow):
             maxFreq = min(self.fHigh.value(), sp.sampleRate//2)
 
             if self.batmode:
-                guide1y = sp.convertFreqtoY(5000)
-                guide2y = sp.convertFreqtoY(7000)
+                guide1y = sp.convertFreqtoY(24000)
+                guide2y = sp.convertFreqtoY(54000)
             else:
                 guide1y = None
                 guide2y = None
