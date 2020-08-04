@@ -1885,11 +1885,19 @@ class AviaNZ(QMainWindow):
 
     def convertAmpltoSpec(self,x):
         """ Unit conversion """
-        return x*self.sampleRate/self.config['incr']
+        if self.batmode:
+            incr = 512
+        else:
+            incr = self.config['incr']
+        return x*self.sampleRate/incr
 
     def convertSpectoAmpl(self,x):
         """ Unit conversion """
-        return x*self.config['incr']/self.sampleRate
+        if self.batmode:
+            incr = 512
+        else:
+            incr = self.config['incr']
+        return x*incr/self.sampleRate
 
     def convertMillisecs(self,millisecs):
         """ Unit conversion """
