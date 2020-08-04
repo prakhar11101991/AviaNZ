@@ -108,7 +108,7 @@ class SignalProc:
         colc = img.colorCount()
         if h==0 or w==0:
             print("ERROR: image was not loaded")
-            return
+            return(1)
 
         # Check color format and convert to grayscale
         if not silent and (not img.allGray() or colc>256):
@@ -122,16 +122,21 @@ class SignalProc:
         img2 = np.array(ptr).reshape(h, w)
 
         # Determine if original image was rotated, based on expected num of freq bins and freq 0 being empty
-        if h==64 and np.all(img2[-1, :]==0):
+        if h==64 and np.median(img2[-1, :]==0):
             # standard DoC format
             pass
-        elif w==64 and np.all(img2[:, -1]==0):
+        elif w==64 and np.median(img2[:, -1]==0):
             # seems like DoC format, rotated at -90*
             img2 = np.rot90(img2, 1, (1,0))
             w, h = h, w
         else:
             print("ERROR: image does not appear to be in DoC format!")
-            return
+            print("Format details:")
+            print(img2)
+            print(h, w)
+            print(min(img2[-1,:]), max(img2[-1,:]))
+            print(np.sum(np.nonzero(img2[-1,:])))
+            return(1)
 
         # Could skip that for visuaal mode - maybe useful for establishing contrast?
         img2[-1, :] = 254  # lowest freq bin is 0, flip that
@@ -163,10 +168,6 @@ class SignalProc:
             # This will be enough if the original image was spectrogram-shape.
             img2 = np.rot90(img2, 1, (1,0))
 
-        if not silent:
-            print(np.shape(img2))
-            print(img2)
-
         self.sg = img2
 
         self.audioFormat.setChannelCount(0)
@@ -180,6 +181,7 @@ class SignalProc:
 
         if not silent:
             print("Detected BMP format: %d x %d px, %d colours" % (w, h, colc))
+        return(0)
 
     def resample(self, target):
         if len(self.data)==0:

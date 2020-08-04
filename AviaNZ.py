@@ -1490,7 +1490,10 @@ class AviaNZ(QMainWindow):
 
             # main read-in:
             if self.batmode:
-                self.sp.readBmp(name)
+                successread = self.sp.readBmp(name)
+                if successread>0:
+                    print("ERROR: file not loaded")
+                    return
                 # this assumes that the entire file is always loaded in BMP mode
                 self.datalength = self.sp.fileLength
             else:
@@ -1613,7 +1616,7 @@ class AviaNZ(QMainWindow):
             self.widthWindow.setRange(0.5, self.datalengthSec)
 
             # Reset it if the file is shorter than the window
-            if self.datalengthSec < self.windowSize:
+            if self.datalengthSec < self.windowSize or self.batmode:
                 self.windowSize = self.datalengthSec
             self.widthWindow.setValue(self.windowSize)
             if self.windowSize<3:

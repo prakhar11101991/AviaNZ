@@ -445,9 +445,6 @@ class AviaNZ_batchProcess(QMainWindow):
             self.method = "Intermittent sampling"
             speciesStr = "Intermittent sampling"
             filters = None
-        #elif "NZ Bats" in self.species:
-            #self.method = "Click"
-            #speciesStr = "Bats"
         else:
             if "NZ Bats" in self.species:
                 self.method = "Click"
@@ -526,7 +523,7 @@ class AviaNZ_batchProcess(QMainWindow):
             text = "Species: " + speciesStr + ", method: " + self.method + ".\nNumber of files to analyze: " + str(total) + ", " + str(cnt) + " done so far.\n"
             text += "Output stored in " + self.dirName + "/DetectionSummary_*.xlsx.\n"
         text += "Log file stored in " + self.dirName + "/LastAnalysisLog.txt.\n"
-        if speciesStr=="Any sound":
+        if speciesStr=="Any sound" or self.method=="Click":
             text += "\nWarning: any previous annotations in these files will be deleted!\n"
         else:
             text += "\nWarning: any previous annotations for the selected species in these files will be deleted!\n"
@@ -853,6 +850,7 @@ class AviaNZ_batchProcess(QMainWindow):
                                 # Create a label (list of dicts with species, certs) for the single segment
                                 print('Assessing file label...')
                                 label = self.File_label(predictions)
+                                print('CNN detected: ', label)
                                 if len(label)>0:
                                     # Convert the annotation into a full segment in self.segments
                                     thisPageStart = start / self.sampleRate
@@ -1006,7 +1004,7 @@ class AviaNZ_batchProcess(QMainWindow):
 
         # Read in stored segments (useful when doing multi-species)
         self.segments = Segment.SegmentList()
-        if species==["Any sound"] or not os.path.isfile(self.filename + '.data'):
+        if species==["Any sound"] or not os.path.isfile(self.filename + '.data') or self.method=="Click":
             # Initialize default metadata values
             self.segments.metadata = dict()
             self.segments.metadata["Operator"] = "Auto"
@@ -1241,26 +1239,6 @@ class AviaNZ_batchProcess(QMainWindow):
             reallyHasLT = LT_mean>=thr1 and LT_best3mean>=thr2
             HasBat = LT_mean>=thr1 and ST_mean>=thr1
 
-            # if reallyHasLT and hasSTlow:
-            #     label.append({"species": "Long-tailed bat", "certainty": 50})
-            # elif reallyHasLT:
-            #     label.append({"species": "Long-tailed bat", "certainty": 100})
-            # elif hasLT and ST_mean<thr1:
-            #     label.append({"species": "Long-tailed bat", "certainty": 50})
-
-            # if reallyHasST and hasLTlow:
-            #     label.append({"species": "Short-tailed bat", "certainty": 50})
-            # elif reallyHasST:
-            #     label.append({"species": "Short-tailed bat", "certainty": 100})
-            # elif hasST and LT_mean<thr1:
-            #     label.append({"species": "Short-tailed bat", "certainty": 50})
-
-            # if LT_mean>=thr1 and ST_mean>=thr1 and not (reallyHasST and reallyHasLT):
-            #     label.append({"species": "Long-tailed bat", "certainty": 50})
-            #     label.append({"species": "Short-tailed bat", "certainty": 50})
-
-
-            # Changed label assignment
             if reallyHasLT and hasSTlow:
                 label.append({"species": "Long-tailed bat", "certainty": 100})
             elif reallyHasLT and reallyHasST:
@@ -1271,15 +1249,13 @@ class AviaNZ_batchProcess(QMainWindow):
                 label.append({"species": "Long-tailed bat", "certainty": 50})
 
             if reallyHasST and hasLTlow:
-                label.append({"species": "Short-tailed  bat", "certainty": 100})
+                label.append({"species": "Short-tailed bat", "certainty": 100})
             elif reallyHasLT and reallyHasST:
-                label.append({"species": "Short-tailed  bat", "certainty": 100})
+                label.append({"species": "Short-tailed bat", "certainty": 100})
             elif hasST and LT_mean<thr1:
                 label.append({"species": "Short-tailed bat", "certainty": 50})
             elif HasBat:
                 label.append({"species": "Short-tailed bat", "certainty": 50})
-
-            
 
         return label
 
