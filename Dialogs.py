@@ -143,7 +143,7 @@ class FileDataDialog(QDialog):
 class Spectrogram(QDialog):
     # Class for the spectrogram dialog box
     # TODO: Steal the graph from Raven (View/Configure Brightness)
-    def __init__(self, width, incr, minFreq, maxFreq, minFreqShow, maxFreqShow, window, parent=None):
+    def __init__(self, width, incr, minFreq, maxFreq, minFreqShow, maxFreqShow, window, batmode=False, parent=None):
         QDialog.__init__(self, parent)
         self.setWindowTitle('Spectrogram Options')
         self.setWindowIcon(QIcon('img/Avianz.ico'))
@@ -185,7 +185,6 @@ class Spectrogram(QDialog):
         self.labelMaxF = QLabel()
         self.labelMaxF.setAlignment(Qt.AlignRight)
 
-        print("initing to", maxFreqShow)
         self.setValues(minFreq, maxFreq, minFreqShow, maxFreqShow)
         self.restore = QPushButton("Restore Defaults && Update")
         self.restore.clicked.connect(self.resetValues)
@@ -207,6 +206,11 @@ class Spectrogram(QDialog):
         form.addRow('Window width', self.window_width)
         form.addRow('Hop', self.incr)
         form.setVerticalSpacing(15)
+
+        # Most of the settings can't be changed when using BMPs:
+        if batmode:
+            for i in range(form.count()):
+                form.itemAt(i).widget().setEnabled(False)
 
         form2 = pg.LayoutWidget()
         form2.addWidget(QLabel('Lowest frequency'), row=0, col=0)
