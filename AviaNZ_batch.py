@@ -828,6 +828,8 @@ class AviaNZ_batchProcess(QMainWindow):
                         if self.method=="Click":
                             # bat-style CNN:
                             model = CNNmodel[0]
+                            thr1 = CNNmodel[5][0]
+                            thr2 = CNNmodel[5][1]
                             if click_label=='Click':
                                 # we enter in the cnn only if we got a click
                                 sg_test = np.ndarray(shape=(np.shape(data_test)[0],np.shape(data_test[0][0])[0], np.shape(data_test[0][0])[1]), dtype=float)
@@ -849,7 +851,7 @@ class AviaNZ_batchProcess(QMainWindow):
 
                                 # Create a label (list of dicts with species, certs) for the single segment
                                 print('Assessing file label...')
-                                label = self.File_label(predictions)
+                                label = self.File_label(predictions, thr1=thr1, thr2=thr2)
                                 print('CNN detected: ', label)
                                 if len(label)>0:
                                     # Convert the annotation into a full segment in self.segments
@@ -1151,29 +1153,16 @@ class AviaNZ_batchProcess(QMainWindow):
 
         return featuress, count
 
-    def File_label(self, predictions):
+    def File_label(self, predictions, thr1, thr2):
         """
         uses the predictions made by the CNN to update the filewise annotations
         when we have 3 labels: 0 (LT), 1(ST), 2 (Noise)
 
-        This version works file by file
-
         METHOD: evaluation of probability over files combining mean of probability
-            + best3mean of probability
+            + best3mean of probability against thr1 and thr2, respectively
 
-        File labels:
-            LT
-            LT?
-            ST
-            ST?
-            Both
-            Both?
-            Noise
+        Returns: species labels (list of dicts), compatible w/ the label format on Segments
         """
-
-        # thresholds for assessing label
-        thr1=10
-        thr2=70
 
         # Assessing file label
         # inizialization
@@ -1784,18 +1773,16 @@ class AviaNZ_reviewAll(QMainWindow):
         self.loadFile(filename, self.species, chunksize)
 
         if self.batmode:
-            guide1freq = 24000
-            guide2freq = 54000
+            guides = [20000, 36000, 50000, 60000]
         else:
-            guide1freq = None
-            guide2freq = None
+            guides = None
 
         # Initialize the dialog for this file
         self.humanClassifyDialog2 = Dialogs.HumanClassify2(self.sps, self.segments, self.indices2show,
                                                            self.species, self.lut, self.colourStart,
                                                            self.colourEnd, self.config['invertColourMap'],
                                                            self.config['brightness'], self.config['contrast'],
-                                                           guide1freq=guide1freq, guide2freq=guide2freq,
+                                                           guidefreq=guides,
                                                            filename=self.filename)
         if hasattr(self, 'dialogPos'):
             self.humanClassifyDialog2.resize(self.dialogSize)
@@ -2130,11 +2117,9 @@ class AviaNZ_reviewAll(QMainWindow):
             maxFreq = min(self.fHigh.value(), sp.sampleRate//2)
 
             if self.batmode:
-                guide1y = sp.convertFreqtoY(24000)
-                guide2y = sp.convertFreqtoY(54000)
+                guides = [sp.convertFreqtoY(f) for f in [20000, 36000, 50000, 60000]]
             else:
-                guide1y = None
-                guide2y = None
+                guides = None
 
             # currLabel, then unbufstart in spec units rel to start, unbufend,
             # then true time to display start, end,
@@ -2142,7 +2127,7 @@ class AviaNZ_reviewAll(QMainWindow):
             # instead of seg[4], if any bugs come up due to Dialog1 changing the label
             self.humanClassifyDialog1.setImage(sp.sg, sp.data, sp.sampleRate, sp.incr,
                                                seg[4], sp.x1nobspec, sp.x2nobspec,
-                                               seg[0], seg[1], guide1y, guide2y, minFreq, maxFreq)
+                                               seg[0], seg[1], guides, minFreq, maxFreq)
         else:
             # store dialog properties such as position for the next file
             self.dialogSize = self.humanClassifyDialog1.size()

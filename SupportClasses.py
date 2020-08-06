@@ -1366,7 +1366,7 @@ class ExcelIO():
 class PicButton(QAbstractButton):
     # Class for HumanClassify dialogs to put spectrograms on buttons
     # Also includes playback capability.
-    def __init__(self, index, spec, audiodata, format, duration, unbufStart, unbufStop, lut, colStart, colEnd, cmapInv, guide1=None, guide2=None, parent=None, cluster=False):
+    def __init__(self, index, spec, audiodata, format, duration, unbufStart, unbufStop, lut, colStart, colEnd, cmapInv, guides=None, parent=None, cluster=False):
         super(PicButton, self).__init__(parent)
         self.index = index
         self.mark = "green"
@@ -1386,9 +1386,9 @@ class PicButton(QAbstractButton):
         else:
             self.noaudio = True
             # batmode frequency guides (in Y positions 0-1)
-            if guide1 is not None and guide2 is not None:
-                self.guide1y = guide1
-                self.guide2y = guide2
+            if guides is not None:
+                self.guides = guides
+                self.guidelines = [0]*len(self.guides)
 
         # setImage reads some properties from self, to allow easy update
         # when color map changes
@@ -1443,8 +1443,8 @@ class PicButton(QAbstractButton):
 
             # create guides for batmode
             if self.noaudio:
-                self.guide1 = QLineF(0, self.im1.height() - self.guide1y/heightRedFact, targwidth, self.im1.height() - self.guide1y/heightRedFact)
-                self.guide2 = QLineF(0, self.im1.height() - self.guide2y/heightRedFact, targwidth, self.im1.height() - self.guide2y/heightRedFact)
+                for i in range(len(self.guides)):
+                    self.guidelines[i] = QLineF(0, self.im1.height() - self.guides[i]/heightRedFact, targwidth, self.im1.height() - self.guides[i]/heightRedFact)
 
     def paintEvent(self, event):
         if type(event) is not bool:
@@ -1468,9 +1468,12 @@ class PicButton(QAbstractButton):
                 painter.drawLine(self.line2)
 
             if self.noaudio:
-                painter.setPen(QPen(QColor(255,255,0), 2))
-                painter.drawLine(self.guide1)
-                painter.drawLine(self.guide2)
+                painter.setPen(QPen(QColor(255,232,140), 2))
+                painter.drawLine(self.guidelines[0])
+                painter.drawLine(self.guidelines[3])
+                painter.setPen(QPen(QColor(239,189,124), 2))
+                painter.drawLine(self.guidelines[1])
+                painter.drawLine(self.guidelines[2])
 
             # draw decision mark
             fontsize = int(self.im1.size().height() * 0.65)

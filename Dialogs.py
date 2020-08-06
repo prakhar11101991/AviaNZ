@@ -1135,10 +1135,13 @@ class HumanClassify1(QDialog):
         self.pPlot.addItem(self.line2)
 
         # prepare guides for marking true segment boundaries
-        self.guide1 = pg.InfiniteLine(angle=0, pen={'color': (255,191,89), 'width': 2})
-        self.guide2 = pg.InfiniteLine(angle=0, pen={'color': (255,191,89), 'width': 2})
-        self.pPlot.addItem(self.guide1)
-        self.pPlot.addItem(self.guide2)
+        self.guidelines = [0]*4
+        self.guidelines[0] = pg.InfiniteLine(angle=0, pen={'color': (255,232,140), 'width': 2})
+        self.guidelines[1] = pg.InfiniteLine(angle=0, pen={'color': (239,189,124), 'width': 2})
+        self.guidelines[2] = pg.InfiniteLine(angle=0, pen={'color': (239,189,124), 'width': 2})
+        self.guidelines[3] = pg.InfiniteLine(angle=0, pen={'color': (255,232,140), 'width': 2})
+        for g in self.guidelines:
+            self.pPlot.addItem(g)
 
         # time texts to go along these two lines
         self.segTimeText1 = pg.TextItem(color=(50,205,50), anchor=(0,1.10))
@@ -1469,7 +1472,7 @@ class HumanClassify1(QDialog):
         # refreshes bird button names
         # to be used when bird list updates
         if self.batmode:
-            for i in range(len(self.birdbtns)-1):
+            for i in range(len(self.birdbtns)):
                 self.birdbtns[i].setChecked(False)
                 self.birdbtns[i].setText(self.batList[i])
         else:
@@ -1488,7 +1491,7 @@ class HumanClassify1(QDialog):
         # based on these, update "previous" arrow status
         self.buttonPrev.setEnabled(done>0)
 
-    def setImage(self, sg, audiodata, sampleRate, incr, labels, unbufStart, unbufStop, time1, time2, guide1y=None, guide2y=None, minFreq=0, maxFreq=0):
+    def setImage(self, sg, audiodata, sampleRate, incr, labels, unbufStart, unbufStop, time1, time2, guides=None, minFreq=0, maxFreq=0):
         """ labels - simply seg[4] of the current segment.
             Be careful not to edit it, as it is NOT a deep copy!!
             Used for extracting current species and calltype.
@@ -1560,14 +1563,12 @@ class HumanClassify1(QDialog):
         self.segTimeText2.setPos(stopV, SgSize)
 
         # bat mode freq guides
-        if guide1y is not None:
-            self.guide1.setPos(guide1y)
+        if guides is not None:
+            for i in range(len(self.guidelines)):
+                self.guidelines[i].setPos(guides[i])
         else:
-            self.guide1.setPos(-10)
-        if guide2y is not None:
-            self.guide2.setPos(guide2y)
-        else:
-            self.guide2.setPos(-10)
+            for i in range(len(self.guidelines)):
+                self.guidelines[i].setPos(-100)
 
         if self.cmapInverted:
             self.plot.setLevels([self.colourEnd, self.colourStart])
@@ -1997,7 +1998,7 @@ class HumanClassify2(QDialog):
         13. Filename - just for setting the window title
     """
 
-    def __init__(self, sps, segments, indicestoshow, label, lut, colourStart, colourEnd, cmapInverted, brightness, contrast, guide1freq=None, guide2freq=None, filename=None):
+    def __init__(self, sps, segments, indicestoshow, label, lut, colourStart, colourEnd, cmapInverted, brightness, contrast, guidefreq=None, filename=None):
         QDialog.__init__(self)
 
         if len(segments)==0:
@@ -2047,8 +2048,7 @@ class HumanClassify2(QDialog):
         #self.volIcon.setStyleSheet("padding: 0px 1px 0px 8px")
 
         # batmode customizations:
-        self.guide1freq = guide1freq
-        self.guide2freq = guide2freq
+        self.guidefreq = guidefreq
         if not haveaudio:
             self.volSlider.setEnabled(False)
             self.volIcon.setEnabled(False)
@@ -2223,18 +2223,16 @@ class HumanClassify2(QDialog):
             self.maxsg = max(self.maxsg, np.max(sp.sg))
 
             # batmode guides, in y of this particular spectrogram:
-            if self.guide1freq is not None:
-                g1y = sp.convertFreqtoY(self.guide1freq)
+            if self.guidefreq is not None:
+                gy = [0]*len(self.guidefreq)
+                for i in range(len(self.guidefreq)):
+                    gy[i] = sp.convertFreqtoY(self.guidefreq[i])
             else:
-                g1y = None
-            if self.guide2freq is not None:
-                g2y = sp.convertFreqtoY(self.guide2freq)
-            else:
-                g2y = None
+                gy = None
 
             # create the button:
             # args: index, sp, audio, format, duration, ubstart, ubstop (in spec units)
-            newButton = SupportClasses.PicButton(i, sp.sg, sp.data, sp.audioFormat, duration, sp.x1nobspec, sp.x2nobspec, self.lut, self.colourStart, self.colourEnd, self.cmapInverted, guide1=g1y, guide2=g2y)
+            newButton = SupportClasses.PicButton(i, sp.sg, sp.data, sp.audioFormat, duration, sp.x1nobspec, sp.x2nobspec, self.lut, self.colourStart, self.colourEnd, self.cmapInverted, guides=gy)
             if newButton.im1.size().width() > self.specH:
                 self.specH = newButton.im1.size().width()
             if newButton.im1.size().height() > self.specV:

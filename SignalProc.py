@@ -48,7 +48,7 @@ class SignalProc:
     Primary parameters are the width of a spectrogram window (window_width) and the shift between them (incr)
     """
 
-    def __init__(self, window_width=256, incr=128, minFreqShow=0, maxFreqShow=0):
+    def __init__(self, window_width=256, incr=128, minFreqShow=0, maxFreqShow=float("inf")):
         # maxFreq = 0 means fall back to Fs/2 for any file.
         self.window_width=window_width
         self.incr=incr
@@ -122,10 +122,12 @@ class SignalProc:
         img2 = np.array(ptr).reshape(h, w)
 
         # Determine if original image was rotated, based on expected num of freq bins and freq 0 being empty
-        if h==64 and np.median(img2[-1, :]==0):
+        # We also used to check if np.median(img2[-1,:])==0,
+        # but some files happen to have the bottom freq bin around 90, so we cannot rely on that.
+        if h==64:
             # standard DoC format
             pass
-        elif w==64 and np.median(img2[:, -1]==0):
+        elif w==64:
             # seems like DoC format, rotated at -90*
             img2 = np.rot90(img2, 1, (1,0))
             w, h = h, w
@@ -135,12 +137,13 @@ class SignalProc:
             print(img2)
             print(h, w)
             print(min(img2[-1,:]), max(img2[-1,:]))
-            print(np.sum(np.nonzero(img2[-1,:])))
+            print(np.sum(img2[-1,:]>0))
+            print(np.median(img2[-1,:]))
             return(1)
 
         # Could skip that for visuaal mode - maybe useful for establishing contrast?
         img2[-1, :] = 254  # lowest freq bin is 0, flip that
-        img2 = 254.0 - img2  # reverse value having the black as the most intense
+        img2 = 255 - img2  # reverse value having the black as the most intense
         img2 = img2/np.max(img2)  # normalization
         img2 = img2[:, 1:]  # Cutting first time bin because it only contains the scale and cutting last columns
         img2 = np.repeat(img2, 8, axis=0)  # repeat freq bins 7 times to fit invertspectrogram
@@ -212,7 +215,11 @@ class SignalProc:
     def convertFreqtoY(self,f):
         """ Unit conversion """
         sgy = np.shape(self.sg)[1]
-        return (f-self.minFreqShow) * sgy / (self.sampleRate//2)
+        if f>self.maxFreqShow:
+            print(f, "not in", self.minFreqShow, self.maxFreqShow)
+            return -10
+        else:
+            return (f-self.minFreqShow) * sgy / (self.maxFreqShow - self.minFreqShow)
 
     def setWidth(self,window_width,incr):
         # Does what it says. Called when the user modifies the spectrogram parameters

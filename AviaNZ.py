@@ -869,8 +869,11 @@ class AviaNZ(QMainWindow):
         self.bar.btn = self.MouseDrawingButton
 
         # guides that can be used in batmode
-        self.guide1 = pg.InfiniteLine(angle=0, movable=False, pen={'color': (255,191,89), 'width': 2})
-        self.guide2 = pg.InfiniteLine(angle=0, movable=False, pen={'color': (255,191,89), 'width': 2})
+        self.guidelines = [0]*4
+        self.guidelines[0] = pg.InfiniteLine(angle=0, movable=False, pen={'color': (255,232,140), 'width': 2})
+        self.guidelines[1] = pg.InfiniteLine(angle=0, movable=False, pen={'color': (239,189,124), 'width': 2})
+        self.guidelines[2] = pg.InfiniteLine(angle=0, movable=False, pen={'color': (239,189,124), 'width': 2})
+        self.guidelines[3] = pg.InfiniteLine(angle=0, movable=False, pen={'color': (255,232,140), 'width': 2})
 
         # A slider to move through the file easily
         self.scrollSlider = QScrollBar(Qt.Horizontal)
@@ -2040,14 +2043,16 @@ class AviaNZ(QMainWindow):
 
         # Frequency guides for bat mode
         if self.batmode:
-            self.guide1.setValue(self.convertFreqtoY(24000))
-            self.guide2.setValue(self.convertFreqtoY(54000))
-            self.p_spec.addItem(self.guide1, ignoreBounds=True)
-            self.p_spec.addItem(self.guide2, ignoreBounds=True)
+            self.guidelines[0].setValue(self.convertFreqtoY(20000))
+            self.guidelines[1].setValue(self.convertFreqtoY(36000))
+            self.guidelines[2].setValue(self.convertFreqtoY(50000))
+            self.guidelines[3].setValue(self.convertFreqtoY(60000))
+            for g in self.guidelines:
+                self.p_spec.addItem(g, ignoreBounds=True)
         else:
             # easy way to hide
-            self.guide1.setValue(-10)
-            self.guide2.setValue(-10)
+            for g in self.guidelines:
+                g.setValue(-1000)
 
         if self.zooniverse:
             offset=6
@@ -3621,22 +3626,17 @@ class AviaNZ(QMainWindow):
         x4 = int((self.listRectanglesa1[self.box1id].getRegion()[1] + self.config['reviewSpecBuffer']) * self.sampleRate)
         x4 = min(x4, self.datalength)
 
-        # TODO MOVE TO BATCH MODE
         # if in batmode, calculate guide line frequencies (not Y in case the shown specs are different sized)
-        if self.guide1.value()>0:
-            guide1y = self.guide1.value()
+        if self.guidelines[0].value()>0:
+            guides = [self.guidelines[i].value() for i in range(4)]
         else:
-            guide1y = None
-        if self.guide2.value()>0:
-            guide2y = self.guide2.value()
-        else:
-            guide2y = None
+            guides = None
 
         # NOTE: might be good to pass copy.deepcopy(seg[4])
         # instead of seg[4], if any bugs come up due to Dialog1 changing the label
         self.humanClassifyDialog1.setImage(self.sg[x1:x2, :], self.audiodata[x3:x4], self.sampleRate, self.config['incr'],
                                     seg[4], x1nob-x1, x2nob-x1,
-                                    seg[0], seg[1], guide1y, guide2y, self.sp.minFreq, self.sp.maxFreq)
+                                    seg[0], seg[1], guides, self.sp.minFreq, self.sp.maxFreq)
 
     def humanClassifyPrevImage(self):
         """ Go back one image by changing boxid and calling NextImage.
@@ -4029,14 +4029,10 @@ class AviaNZ(QMainWindow):
                     sps.append(sp)
 
             # if in batmode, calculate guide line frequencies (not Y in case the shown specs are different sized)
-            if self.guide1.value()>0:
-                guide1freq = self.convertYtoFreq(self.guide1.value())
+            if self.guidelines[0].value()>0:
+                guides = [self.convertYtoFreq(self.guidelines[i].value()) for i in range(4)]
             else:
-                guide1freq = None
-            if self.guide2.value()>0:
-                guide2freq = self.convertYtoFreq(self.guide2.value())
-            else:
-                guide2freq = None
+                guides = None
 
             # main dialog:
             # Note: always showing only the current page
@@ -4045,7 +4041,7 @@ class AviaNZ(QMainWindow):
                                                                self.revLabel, self.lut, self.colourStart,
                                                                self.colourEnd, self.config['invertColourMap'],
                                                                self.config['brightness'], self.config['contrast'],
-                                                               guide1freq=guide1freq, guide2freq=guide2freq)
+                                                               guidefreq=guides)
             if hasattr(self, 'humanClassifyDialogSize'):
                 self.humanClassifyDialog2.resize(self.humanClassifyDialogSize)
             self.humanClassifyDialog2.finish.clicked.connect(self.humanClassifyClose2)
